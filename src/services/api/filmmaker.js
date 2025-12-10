@@ -24,6 +24,8 @@ export const filmmmakerService = {
   getDashboard: () => filmmmakerAPI.get('/dashboard'),
   getMovieAnalytics: (movieId) => filmmmakerAPI.get(`/analytics/${movieId}`),
   getStats: () => filmmmakerAPI.get('/stats'),
+  getSeriesEpisodes: (seriesId) => filmmmakerAPI.get(`/series/${seriesId}/episodes`),
+
 
   // ====== PAYMENT METHOD ======
   getPaymentMethod: () => filmmmakerAPI.get('/payment-method'),

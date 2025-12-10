@@ -91,10 +91,10 @@ function PaymentMethodSetup() {
         return false;
       }
       // Validate phone number format (international format)
-      if (!/^\+?[1-9]\d{1,14}$/.test(formData.momoPhoneNumber.replace(/\s/g, ''))) {
-        setError('Please enter a valid phone number (e.g., +256701234567)');
-        return false;
-      }
+ if (!/^(078|079)\d{7}$/.test(formData.momoPhoneNumber)) {
+  setError('Enter your MTN Mobile Money phone number (e.g., 0781234567)');
+  return false;
+}
     } else if (formData.paymentMethod === 'bank_transfer') {
       if (!formData.bankAccountHolder || !formData.bankName || !formData.accountNumber) {
         setError('Please fill in all bank_transfer account details');
@@ -450,11 +450,11 @@ function PaymentMethodSetup() {
                   name="momoPhoneNumber"
                   value={formData.momoPhoneNumber}
                   onChange={handleChange}
-                  placeholder="+256701234567"
+                  placeholder="079******* OR 078****"
                   className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
                 />
                 <p className="text-xs text-gray-400 mt-1">
-                  Enter your MTN Mobile Money phone number in international format (e.g., +256701234567)
+                  Enter your MTN Mobile Money phone number in international format (e.g., 079***** OR 078*****)
                 </p>
               </div>
 

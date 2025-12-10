@@ -23,6 +23,15 @@ const mergeMovies = (backendMovies, tmdbMovies, limit = 20) => {
   return combined.slice(0, limit);
 };
 
+// Helper function to extract movies from backend response
+const extractBackendMovies = (response) => {
+  if (!response) return [];
+  if (response.data && response.data.movies) {
+    return response.data.movies;
+  }
+  return [];
+};
+
 export const MovieProvider = ({ children }) => {
   const [trendingMovies, setTrendingMovies] = useState([]);
   const [topRatedMovies, setTopRatedMovies] = useState([]);
@@ -40,6 +49,8 @@ export const MovieProvider = ({ children }) => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // Fetch all data in parallel
         const [
           tmdbTrending,
           tmdbTopRated,
@@ -49,12 +60,12 @@ export const MovieProvider = ({ children }) => {
           tmdbUpcoming,
           tmdbLatest,
           tmdbTrendingweek,
-          backendUpcoming,
-          backendTrending,
-          backendTopRated,
-          backendFeatured,
-          backendPopular,
-          backendRecent
+          backendUpcomingResp,
+          backendTrendingResp,
+          backendTopRatedResp,
+          backendFeaturedResp,
+          backendPopularResp,
+          backendRecentResp
         ] = await Promise.all([
           getTrendingMovies(),
           getTopRatedMovies(),
@@ -64,15 +75,23 @@ export const MovieProvider = ({ children }) => {
           getUpcomingMovies(),
           getLatestMovies(),
           getTrendingWeekMovies(),
-          getBackendUpcomingMovies().catch(() => []),
-          getBackendTrendingMovies().catch(() => []),
-          getBackendTopRatedMovies().catch(() => []),
-          getBackendFeaturedMovies().catch(() => []),
-          getBackendPopularMovies().catch(() => []),
-          getBackendRecentMovies().catch(() => [])
+          getBackendUpcomingMovies().catch(() => ({ data: { movies: [] } })),
+          getBackendTrendingMovies().catch(() => ({ data: { movies: [] } })),
+          getBackendTopRatedMovies().catch(() => ({ data: { movies: [] } })),
+          getBackendFeaturedMovies().catch(() => ({ data: { movies: [] } })),
+          getBackendPopularMovies().catch(() => ({ data: { movies: [] } })),
+          getBackendRecentMovies().catch(() => ({ data: { movies: [] } }))
         ]);
 
-        // Merge backend movies with TMDB movies (backend first for priority)
+        // Extract movies from backend responses
+        const backendUpcoming = extractBackendMovies(backendUpcomingResp);
+        const backendTrending = extractBackendMovies(backendTrendingResp);
+        const backendTopRated = extractBackendMovies(backendTopRatedResp);
+        const backendFeatured = extractBackendMovies(backendFeaturedResp);
+        const backendPopular = extractBackendMovies(backendPopularResp);
+        const backendRecent = extractBackendMovies(backendRecentResp);
+
+        // Set state with merged data
         setTrendingMovies(mergeMovies(backendTrending, tmdbTrending));
         setTopRatedMovies(mergeMovies(backendTopRated, tmdbTopRated));
         setPopularMovies(mergeMovies(backendPopular, tmdbPopular));
@@ -81,9 +100,10 @@ export const MovieProvider = ({ children }) => {
         setUpcomingMovies(mergeMovies(backendUpcoming, tmdbUpcoming));
         setLatestMovies(mergeMovies(backendRecent, tmdbLatest));
         setTrendingWeekly(mergeMovies(backendFeatured, tmdbTrendingweek));
+        
       } catch (err) {
         console.error("Error fetching movies:", err);
-        setError(err);
+        setError(err.message || "Failed to fetch movies");
       } finally {
         setLoading(false);
       }

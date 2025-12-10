@@ -22,6 +22,8 @@ function WithdrawalRequest() {
 
   const MINIMUM_WITHDRAWAL = 50;
 
+  console.log('Payment Method:', paymentMethod);
+
   // Helper function to safely convert to number and format currency
   const formatCurrency = (value) => {
     const num = parseFloat(value) || 0;

@@ -14,19 +14,23 @@ function UserHomepage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+
+  // console.log('Selected Movie ID:', allMovies);
+
   useEffect(() => {
     const fetchMovies = async () => {
       try {
         setLoading(true);
         // Fetch all uploaded movies from backend
         const response = await moviesService.getAllMovies({ limit: 50 });
+        console.log('API Response:', response.data.data.movies);
 
         // Handle API response structure: response.data.data contains the movies array
-        const rawMovies = response.data?.data || response.data || [];
+        const rawMovies = response.data?.data.movies || response.data || [];
 
         if (Array.isArray(rawMovies) && rawMovies.length > 0) {
           // Normalize movies to work with existing UI components
-          const normalizedMovies = normalizeMovies(rawMovies);
+          const normalizedMovies = rawMovies;
           setAllMovies(normalizedMovies);
 
           // Set trending movies (sorted by popularity/totalViews)

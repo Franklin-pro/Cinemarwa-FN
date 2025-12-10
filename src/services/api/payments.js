@@ -31,9 +31,13 @@ export const paymentsService = {
   processStripePayment: (paymentData) =>
     paymentsAxios.post('/stripe', paymentData),
   
+  processSubscriptionMomoPayment: (paymentData) =>
+    paymentsAxios.post('/subscription/momo', paymentData),
+  processSubscriptionStripePayment: (paymentData) =>
+    paymentsAxios.post('/subscription/stripe', paymentData),
   // Get payment details
   getPaymentDetails: (paymentId) =>
-    paymentsAxios.get(`/${paymentId}`),
+    paymentsAxios.get(`/status/${paymentId}`),
   
   // Get user's payment history
   getPaymentHistory: (userId, params = {}) =>

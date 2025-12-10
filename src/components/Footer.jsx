@@ -1,7 +1,21 @@
 import { Facebook, Github, Instagram, TwitterIcon } from "lucide-react";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
 
 function Footer() {
+  const [userIsLoggedIn, setUserIsLoggedIn] = useState(false);
+  const { user } = useSelector((state) => state.auth);
+  
+  // detect login state
+  useEffect(() => {
+    setUserIsLoggedIn(!!(user && user.token));
+  }, [user]);
+
+  // 🔥 hide footer if user is filmmaker or admin
+  if (userIsLoggedIn && ["filmmaker", "admin"].includes(user?.role)) {
+    return null;
+  }
+
   return (
     <footer className="bg-neutral-900 text-neutral-400 border-t border-neutral-800">
       <div className="container mx-auto px-4 py-12">
@@ -39,6 +53,7 @@ function Footer() {
               </a>
             </div>
           </div>
+
           <div>
             <h3 className="font-bold text-white text-lg mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
@@ -81,6 +96,7 @@ function Footer() {
               </li>
             </ul>
           </div>
+
           <div>
             <h3 className="font-bold text-white text-lg mb-4">Resources</h3>
             <ul className="space-y-2 text-sm">
@@ -123,6 +139,7 @@ function Footer() {
               </li>
             </ul>
           </div>
+
           <div>
             <h3 className="font-bold text-white text-lg mb-4">News Letter</h3>
             <p className="text-sm mb-4">
@@ -145,14 +162,19 @@ function Footer() {
 
         <div className="border-t mt-3 pt-6 flex flex-col md:flex-row justify-between border-neutral-800">
           <p className="text-xs">
-            &copy; {new Date().getFullYear()}
-            CineVerse All right reserved. <br className="md:hidden" />
+            &copy; {new Date().getFullYear()} CineVerse All right reserved.{" "}
+            <br className="md:hidden" />
             <span className="hidden md:inline">.</span>
-            Poweblue by{" "}
-            <a href="https://franklindevloper.netlify.app/" target="_blank" className="text-blue-400 font-semibold hover:text-blue-300">
+            Powered by{" "}
+            <a
+              href="https://franklindevloper.netlify.app/"
+              target="_blank"
+              className="text-blue-400 font-semibold hover:text-blue-300"
+            >
               Franklin Developer
             </a>
           </p>
+
           <div className="flex space-x-4 mt-4 md:mt-0 text-xs">
             <a
               href="#privancy policy"
@@ -167,7 +189,7 @@ function Footer() {
               Terms of Service
             </a>
             <a href="" className="hover:text-blue-400 transition-all">
-              help center
+              Help Center
             </a>
           </div>
         </div>
