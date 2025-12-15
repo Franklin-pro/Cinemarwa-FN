@@ -58,7 +58,7 @@ function MovieDetailsPages() {
       navigate('/login', { state: { from: `/movie/${id}` } });
       return;
     }
-    navigate(`/payment/${id}?type=watch`);
+    navigate(`/payment/${id}?type=movie_watch`);
   };
 
   // Handle download button
@@ -67,7 +67,7 @@ function MovieDetailsPages() {
       navigate('/login', { state: { from: `/movie/${id}` } });
       return;
     }
-    navigate(`/payment/${id}?type=download`);
+    navigate(`/payment/${id}?type=movie_download`);
   };
 
   // Loading state

@@ -24,6 +24,8 @@ export const filmmmakerService = {
   getDashboard: () => filmmmakerAPI.get('/dashboard'),
   getMovieAnalytics: (movieId) => filmmmakerAPI.get(`/analytics/${movieId}`),
   getStats: () => filmmmakerAPI.get('/stats'),
+  getSeriesEpisodes: (seriesId) => filmmmakerAPI.get(`/series/${seriesId}/episodes`),
+
 
   // ====== PAYMENT METHOD ======
   getPaymentMethod: () => filmmmakerAPI.get('/payment-method'),
@@ -31,7 +33,7 @@ export const filmmmakerService = {
 
   // ====== FINANCIAL ======
   getFinancialSummary: () => filmmmakerAPI.get('/finance'),
-  requestWithdrawal: (amount) => filmmmakerAPI.post('/withdraw', { amount }),
+  // requestWithdrawal: (amount) => filmmmakerAPI.post('/withdrawals/request', { amount }),
   getWithdrawalHistory: () => filmmmakerAPI.get('/withdrawals'),
 
   // ====== MOVIE MANAGEMENT ======

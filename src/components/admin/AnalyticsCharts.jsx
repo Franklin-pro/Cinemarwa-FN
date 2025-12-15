@@ -80,7 +80,7 @@ export function RevenueChart({ revenue, platformEarnings, period }) {
             cx="50%"
             cy="50%"
             labelLine={false}
-            label={({ name, value }) => `${name}: $${value.toFixed(2)}`}
+            label={({ name, value }) => `${name}:  RWF ${value.toFixed(2)}`}
             outerRadius={100}
             fill="#8884d8"
             dataKey="value"
@@ -96,7 +96,7 @@ export function RevenueChart({ revenue, platformEarnings, period }) {
               borderRadius: '8px',
             }}
             labelStyle={{ color: '#F3F4F6' }}
-            formatter={(value) => `$${value.toFixed(2)}`}
+            formatter={(value) => `RWF ${value.toFixed(2)}`}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -129,7 +129,7 @@ export function TopFilmmakersChart({ filmmakers }) {
                 borderRadius: '8px',
               }}
               labelStyle={{ color: '#F3F4F6' }}
-              formatter={(value) => `$${value.toFixed(2)}`}
+              formatter={(value) => `RWF ${value.toFixed(2)}`}
             />
             <Legend />
             <Bar dataKey="earnings" fill="#10B981" name="Earnings" />
@@ -214,7 +214,7 @@ export function AnalyticsSummary({ data, period }) {
         <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-4">
           <p className="text-gray-400 text-sm mb-2">Revenue</p>
           <p className="text-3xl font-bold text-purple-400">
-            ${parseFloat(data?.metrics?.revenue || 0).toFixed(2)}
+            RWF {parseFloat(data?.metrics?.revenue || 0).toFixed(2)}
           </p>
         </div>
       </div>
@@ -260,7 +260,7 @@ export function FilmmakersSummaryTable({ filmmakers }) {
                     {(filmmaker.filmmmakerStats?.averageRating || 0).toFixed(2)} ⭐
                   </td>
                   <td className="py-3 px-4 text-right text-green-400 font-semibold">
-                    ${(filmmaker.filmmmakerFinance?.totalEarned || 0).toFixed(2)}
+                    RWF {(filmmaker.filmmmakerFinance?.totalEarned || 0).toFixed(2)}
                   </td>
                 </tr>
               ))}

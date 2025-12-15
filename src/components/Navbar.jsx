@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Search, Menu, X, User, LogOut, Settings, BarChart3 } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { logout } from "../store/slices/authSlice";
-import { searchMovies, searchBackendMovies } from "../services/api";
+import { logoutAll } from "../store/slices/authSlice";
+import { searchBackendMovies } from "../services/api";
 import { useMovies } from "../context/MovieContext";
 
 const Navbar = () => {
@@ -14,7 +14,7 @@ const Navbar = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [searchSource, setSearchSource] = useState("tmdb"); // 'tmdb' or 'backend'
+  // search uses backend only
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ const Navbar = () => {
   const toggleProfile = () => setIsProfileOpen(!isProfileOpen);
 
   const handleLogout = async () => {
-    await dispatch(logout());
+    await dispatch(logoutAll());
     setIsProfileOpen(false);
     navigate("/");
   };
@@ -94,12 +94,7 @@ const Navbar = () => {
     setSearchError(null);
 
     try {
-      let data;
-      if (searchSource === "backend") {
-        data = await searchBackendMovies(searchQuery);
-      } else {
-        data = await searchMovies(searchQuery);
-      }
+      const data = await searchBackendMovies(searchQuery);
       setResults(data || []);
       setSearchError(data.length === 0 ? "No results found" : null);
     } catch (error) {
@@ -109,7 +104,7 @@ const Navbar = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [searchSource]);
+  }, []);
 
   // Handle selecting a movie
   const handleMovieSelect = (movie) => {
@@ -222,9 +217,11 @@ const Navbar = () => {
                       >
                         <img
                           src={
-                            movie.poster_path
-                              ? `https://image.tmdb.org/t/p/w92${movie.poster_path}`
-                              : "https://via.placeholder.com/92x138/333/fff?text=No+Image"
+                            movie.poster && movie.poster.startsWith && movie.poster.startsWith('http')
+                              ? movie.poster
+                              : movie.poster_path
+                                ? `https://image.tmdb.org/t/p/w92${movie.poster_path}`
+                                : "https://via.placeholder.com/92x138/333/fff?text=No+Image"
                           }
                           alt={movie.title}
                           className="w-8 h-12 object-cover rounded"
@@ -256,32 +253,7 @@ const Navbar = () => {
           )}
             </div>
 
-          {/* Search Source Toggle */}
-          <div className="flex items-center bg-neutral-800 rounded-full px-3 py-2 gap-2">
-            <button
-              onClick={() => setSearchSource("tmdb")}
-              className={`text-xs px-2 py-1 rounded transition ${
-                searchSource === "tmdb"
-                  ? "bg-blue-500 text-white"
-                  : "text-neutral-400 hover:text-white"
-              }`}
-              title="Search using TMDB database"
-            >
-              TMDB
-            </button>
-            <div className="w-px h-4 bg-neutral-600"></div>
-            <button
-              onClick={() => setSearchSource("backend")}
-              className={`text-xs px-2 py-1 rounded transition ${
-                searchSource === "backend"
-                  ? "bg-blue-500 text-white"
-                  : "text-neutral-400 hover:text-white"
-              }`}
-              title="Search using backend database"
-            >
-              Database
-            </button>
-          </div>
+          {/* Search uses backend only */}
         </div>
 
         {/* Desktop Auth Section */}
@@ -429,10 +401,12 @@ const Navbar = () => {
                           >
                             <img
                               src={
-                                movie.poster_path
-                                  ? `https://image.tmdb.org/t/p/w92${movie.poster_path}`
-                                  : "https://via.placeholder.com/92x138/333/fff?text=No+Image"
-                              }
+                                  movie.poster && movie.poster.startsWith && movie.poster.startsWith('http')
+                                    ? movie.poster
+                                    : movie.poster_path
+                                      ? `https://image.tmdb.org/t/p/w92${movie.poster_path}`
+                                      : "https://via.placeholder.com/92x138/333/fff?text=No+Image"
+                                }
                               alt={movie.title}
                               className="w-8 h-12 object-cover rounded"
                             />

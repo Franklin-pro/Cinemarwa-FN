@@ -376,6 +376,9 @@ function Login() {
                 <p className="text-xs text-blue-300">
                   <strong>Device Recognition:</strong> This device will be remembered for secure login.
                   Free accounts allow 1 device, premium allows 2 devices.
+                  <a href="/upgrade" className="text-blue-400 text-lg hover:text-blue-300 ml-1">
+                    upgrade now
+                  </a>
                 </p>
               </div>
             </div>

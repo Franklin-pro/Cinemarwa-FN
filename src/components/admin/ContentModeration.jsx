@@ -81,7 +81,7 @@ function ContentModeration() {
           ) : (
             pendingMovies.map((movie) => (
               <div
-                key={movie._id}
+                key={movie.id}
                 className="bg-gray-800/50 border border-gray-700 rounded-lg p-6"
               >
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -125,20 +125,20 @@ function ContentModeration() {
                     {/* Actions */}
                     <div className="flex gap-3">
                       <button
-                        onClick={() => handleApproveMovie(movie._id)}
-                        disabled={approvalInProgress === movie._id}
+                        onClick={() => handleApproveMovie(movie.id)}
+                        disabled={approvalInProgress === movie.id}
                         className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded-lg font-medium transition-all"
                       >
                         <CheckCircle className="w-5 h-5" />
-                        {approvalInProgress === movie._id ? 'Processing...' : 'Approve'}
+                        {approvalInProgress === movie.id ? 'Processing...' : 'Approve'}
                       </button>
                       <button
-                        onClick={() => handleRejectMovie(movie._id)}
-                        disabled={approvalInProgress === movie._id}
+                        onClick={() => handleRejectMovie(movie.id)}
+                        disabled={approvalInProgress === movie.id}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 rounded-lg font-medium transition-all"
                       >
                         <XCircle className="w-5 h-5" />
-                        {approvalInProgress === movie._id ? 'Processing...' : 'Reject'}
+                        {approvalInProgress === movie.id ? 'Processing...' : 'Reject'}
                       </button>
                     </div>
                   </div>
@@ -180,7 +180,7 @@ function ContentModeration() {
             ) : (
               flaggedContent.map((item) => (
                 <div
-                  key={item._id}
+                  key={item.id}
                   className="bg-gray-800/50 border border-yellow-600/30 rounded-lg p-6"
                 >
                   <div className="flex items-start gap-4">

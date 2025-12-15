@@ -25,6 +25,14 @@ export const moviesService = {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: onUploadProgress,
     }),
+  createSeries : (filmmakerId,formData) =>
+    moviesAxios.post(`/${filmmakerId}/series`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+addEpisodeToSeries : (filmmakerId,seriesId, formData) =>
+    moviesAxios.post(`/${filmmakerId}/series/${seriesId}/add-episode`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
   updateMovie: (id, data) => moviesAxios.put(`/${id}`, data),
   deleteMovie: (id) => moviesAxios.delete(`/${id}`),
 
@@ -40,6 +48,9 @@ export const moviesService = {
     moviesAxios.put(`/${movieId}/reviews/${reviewId}`, reviewData),
   deleteReview: (movieId, reviewId) =>
     moviesAxios.delete(`/${movieId}/reviews/${reviewId}`),
+    // Get filmmaker's series
+  getFilmmakerSeries: (filmmakerId) =>
+    moviesAxios.get(`/movies/filmmaker/${filmmakerId}/series`).then(res => res.data),
 
   // Ratings
   rateMovie: (movieId, rating) =>
@@ -52,6 +63,7 @@ export const moviesService = {
 
   // Stats
   getMovieStats: (movieId) => moviesAxios.get(`/${movieId}/stats`),
+  getSecureStreamUrl: (movieId) => moviesAxios.get(`/secure-stream/${movieId}`),
 };
 
 // Export as named export for easier use

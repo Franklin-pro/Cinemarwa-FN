@@ -1,7 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, AlertCircle, CheckCircle, Loader, ArrowRight } from 'lucide-react';
+import { 
+  DollarSign, 
+  AlertCircle, 
+  CheckCircle, 
+  Loader, 
+  ArrowRight, 
+  CreditCard, 
+  Wallet,
+  Calendar,
+  Clock,
+  Shield,
+  Smartphone,
+  TrendingUp,
+  Info,
+  Building
+} from 'lucide-react';
 import { filmmmakerService } from '../../services/api/filmmaker';
+import { paymentsService } from '../../services/api/payments';
+import { useSelector } from 'react-redux';
 
 function WithdrawalRequest() {
   const navigate = useNavigate();
@@ -14,18 +31,26 @@ function WithdrawalRequest() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
 
+   const { user } = useSelector((state) => state.auth);
+
   const [formData, setFormData] = useState({
     amount: '',
-    withdrawalMethod: 'bank',
     notes: '',
   });
 
-  const MINIMUM_WITHDRAWAL = 50;
+  const MINIMUM_WITHDRAWAL = 5; // 5 RWF minimum
 
   // Helper function to safely convert to number and format currency
   const formatCurrency = (value) => {
     const num = parseFloat(value) || 0;
-    return num.toFixed(2);
+    return new Intl.NumberFormat('en-RW', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(num);
+  };
+
+  const formatRwf = (value) => {
+    return `RWF ${value}`;
   };
 
   useEffect(() => {
@@ -43,9 +68,10 @@ function WithdrawalRequest() {
       ]);
 
       setStats(statsRes.data);
-      setWithdrawalHistory(historyRes.data?.withdrawals || []);
-      setFinance(financeRes.data);
-      setPaymentMethod(paymentRes.data);
+      setWithdrawalHistory(historyRes.data?.withdrawalHistory || []);
+      setFinance(financeRes.data.data);
+      console.log('Payment Method Response:', financeRes.data.data);
+      setPaymentMethod(paymentRes.data.data);
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load withdrawal information');
@@ -72,7 +98,7 @@ function WithdrawalRequest() {
     }
 
     const amount = parseFloat(formData.amount);
-    const availableBalance = finance?.balance?.pendingBalance || stats?.availableBalance || 0;
+    const availableBalance = finance?.balance?.pendingBalance || finance?.balance?.availableBalance || 0;
 
     if (!formData.amount || isNaN(amount)) {
       setError('Please enter a valid amount');
@@ -80,17 +106,12 @@ function WithdrawalRequest() {
     }
 
     if (amount < MINIMUM_WITHDRAWAL) {
-      setError(`Minimum withdrawal amount is $${MINIMUM_WITHDRAWAL}`);
+      setError(`Minimum withdrawal amount is RWF ${formatCurrency(MINIMUM_WITHDRAWAL)}`);
       return false;
     }
 
     if (amount > availableBalance) {
-      setError(`Withdrawal amount exceeds available balance of $${formatCurrency(availableBalance)}`);
-      return false;
-    }
-
-    if (!formData.withdrawalMethod) {
-      setError('Please select a withdrawal method');
+      setError(`Withdrawal amount exceeds available balance of ${formatRwf(availableBalance)}`);
       return false;
     }
 
@@ -109,13 +130,18 @@ function WithdrawalRequest() {
       setError(null);
       setSuccess(null);
 
-      const response = await filmmmakerService.requestWithdrawal(parseFloat(formData.amount));
+      const response = await paymentsService.requestWithdrawal(
+        user.id,
+        {
+        amount: parseFloat(formData.amount),
+        payoutMethod: paymentMethod.currentMethod,
+        notes: formData.notes,
+      });
 
-      if (response.data) {
-        setSuccess(`Withdrawal request of $${formData.amount} submitted successfully! You'll receive your funds in 5-7 business days.`);
+      if (response.data?.success) {
+        setSuccess(`Withdrawal request of ${formatRwf(formData.amount)} submitted successfully! You'll receive your funds in 3-5 business days.`);
         setFormData({
           amount: '',
-          withdrawalMethod: 'bank',
           notes: '',
         });
 
@@ -134,257 +160,471 @@ function WithdrawalRequest() {
     }
   };
 
+  const getPaymentMethodIcon = (method) => {
+    switch(method) {
+      case 'momo': return <Smartphone className="w-5 h-5" />;
+      case 'bank_transfer': return <Building className="w-5 h-5" />;
+      case 'stripe': return <CreditCard className="w-5 h-5" />;
+      case 'paypal': return <CreditCard className="w-5 h-5" />;
+      default: return <Wallet className="w-5 h-5" />;
+    }
+  };
+
+  const getPaymentMethodLabel = (method) => {
+    switch(method) {
+      case 'momo': return 'MTN Mobile Money';
+      case 'bank_transfer': return 'Bank Transfer';
+      case 'stripe': return 'Stripe';
+      case 'paypal': return 'PayPal';
+      default: return 'Bank Transfer';
+    }
+  };
+
+  const getPaymentMethodDetails = () => {
+    if (!paymentMethod?.currentMethod) return null;
+    
+    const method = paymentMethod.currentMethod;
+    const details = paymentMethod.paymentDetails;
+    
+    switch(method) {
+      case 'momo':
+        return details?.momo ? `MoMo: ${details.momo}` : 'MoMo number not configured';
+      case 'bank_transfer':
+        return details?.bankDetails ? 
+          `Bank: ${details.bankDetails.bankName} ••••${details.bankDetails.accountNumber?.slice(-4)}` : 
+          'Bank details not configured';
+      case 'stripe':
+        return details?.stripeAccountId ? 'Stripe Connected Account' : 'Stripe not configured';
+      case 'paypal':
+        return details?.paypalEmail ? `PayPal: ${details.paypalEmail}` : 'PayPal not configured';
+      default:
+        return 'Payment method details';
+    }
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 text-gray-900 dark:text-white flex items-center justify-center">
         <div className="text-center">
-          <Loader className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-500" />
-          <p className="text-gray-400">Loading withdrawal information...</p>
+          <div className="w-16 h-16 mx-auto mb-4 relative">
+            <div className="absolute inset-0 border-4 border-blue-200 dark:border-blue-900 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-blue-600 dark:border-blue-500 rounded-full border-t-transparent animate-spin"></div>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 animate-pulse">Loading withdrawal information...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-950 via-gray-900 to-black text-white px-4 py-8">
-      <div className="max-w-4xl pt-16 mx-auto">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950 text-gray-900 dark:text-white px-4 py-8">
+      <div className="max-w-6xl pt-16 mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={() => navigate('/dashboard/filmmaker')}
-            className="text-blue-400 hover:text-blue-300 mb-4 flex items-center gap-2"
-          >
-            ← Back to Dashboard
-          </button>
-          <h1 className="text-3xl font-bold mb-2 flex items-center gap-3">
-            <DollarSign className="w-8 h-8 text-blue-400" />
-            Request Withdrawal
-          </h1>
-          <p className="text-gray-400">Withdraw your earnings to your bank account or payment method</p>
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <button
+                onClick={() => navigate('/dashboard/filmmaker')}
+                className="inline-flex items-center gap-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 mb-4 transition-colors group"
+              >
+                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center group-hover:bg-blue-200 dark:group-hover:bg-blue-800/50 transition-colors">
+                  <ArrowRight className="w-3 h-3 rotate-180" />
+                </div>
+                <span className="text-sm font-medium">Back to Dashboard</span>
+              </button>
+              <h1 className="text-3xl md:text-4xl font-bold mb-3 flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <DollarSign className="w-6 h-6 text-white" />
+                </div>
+                <span>Request Withdrawal</span>
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 text-lg max-w-2xl">
+                Withdraw your earnings directly to your configured payment method
+              </p>
+            </div>
+            <div className="hidden md:block">
+              <div className="px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-sm font-medium">
+                Secure Transaction
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Available Balance</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatRwf(finance?.balance?.pendingBalance || finance?.balance?.availableBalance || 0)}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Total Earned</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatRwf(finance?.balance?.totalEarned || stats?.totalEarnings || 0)}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Minimum Withdrawal</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {formatRwf(MINIMUM_WITHDRAWAL)}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900/30 rounded-lg flex items-center justify-center">
+                  <Info className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Alerts */}
-        {error && (
-          <div className="mb-6 bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-            <p className="text-blue-200">{error}</p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-6 bg-green-500/10 border border-green-500/50 rounded-lg p-4 flex items-start gap-3">
-            <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-            <p className="text-green-200">{success}</p>
-          </div>
-        )}
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Form */}
+        {/* Main Content */}
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Left Column - Withdrawal Form */}
           <div className="lg:col-span-2">
-            <form onSubmit={handleSubmit} className="bg-gray-800/40 border border-gray-700 rounded-lg p-6 space-y-6">
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Withdrawal Details</h2>
+            {/* Alerts */}
+            {error && (
+              <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-start gap-3 animate-fadeIn">
+                <AlertCircle className="w-5 h-5 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-red-700 dark:text-red-300 font-medium">Attention Required</p>
+                  <p className="text-red-600 dark:text-red-400/80 text-sm mt-1">{error}</p>
+                </div>
+              </div>
+            )}
 
-                {/* Balance Summary */}
-                <div className="mb-6 grid grid-cols-2 gap-4">
-                  {/* Available Balance */}
-                  <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-1">Available Balance</p>
-                    <p className="text-2xl font-bold text-green-400">
-                      ${formatCurrency(finance?.balance?.pendingBalance || stats?.availableBalance || 0)}
-                    </p>
+            {success && (
+              <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl p-4 flex items-start gap-3 animate-fadeIn">
+                <CheckCircle className="w-5 h-5 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-green-700 dark:text-green-300 font-medium">Success!</p>
+                  <p className="text-green-600 dark:text-green-400/80 text-sm mt-1">{success}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Withdrawal Form */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+              <div className="p-6 md:p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                    <Wallet className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                   </div>
-
-                  {/* Pending Balance */}
-                  <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                    <p className="text-sm text-gray-400 mb-1">Total Earned</p>
-                    <p className="text-2xl font-bold text-blue-400">
-                      ${formatCurrency(finance?.balance?.totalEarned || 0)}
-                    </p>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Withdrawal Request</h2>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Fill in the details to request a withdrawal</p>
                   </div>
                 </div>
 
-                {/* Payment Method Status */}
-                {!paymentMethod?.currentMethod ? (
-                  <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg flex items-start gap-3">
-                    <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-blue-200 font-semibold">No Payment Method Configured</p>
-                      <p className="text-blue-100/70 text-sm mt-1">You must add a payment method before requesting a withdrawal</p>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/filmmaker/payment-method')}
-                        className="mt-2 text-sm underline text-blue-300 hover:text-blue-200"
-                      >
-                        Go to Payment Methods →
-                      </button>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Current Payment Method */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Payment Method
+                    </label>
+                    <div className={`p-4 rounded-lg border ${!paymentMethod?.currentMethod ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {paymentMethod?.currentMethod ? (
+                            <>
+                              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
+                                {getPaymentMethodIcon(paymentMethod.currentMethod)}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-900 dark:text-white">
+                                  {getPaymentMethodLabel(paymentMethod.currentMethod)}
+                                </p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                                  {getPaymentMethodDetails()}
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex items-center justify-center">
+                                <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                              </div>
+                              <div>
+                                <p className="font-medium text-yellow-700 dark:text-yellow-300">No Payment Method Configured</p>
+                                <p className="text-sm text-yellow-600 dark:text-yellow-400/80 mt-0.5">
+                                  You must add a payment method before withdrawing
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                        {!paymentMethod?.currentMethod && (
+                          <button
+                            type="button"
+                            onClick={() => navigate('/filmmaker/payment-method')}
+                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 px-4 py-2 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                          >
+                            Add Method
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Amount Input */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Withdrawal Amount *
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3 top-3 text-gray-400 dark:text-gray-500 font-medium">RWF</div>
+                      <input
+                        type="text"
+                        name="amount"
+                        value={formData.amount}
+                        onChange={handleChange}
+                        placeholder="0"
+                        min={MINIMUM_WITHDRAWAL}
+                        max={finance?.balance?.pendingBalance || finance?.balance?.availableBalance || 0}
+                        className="w-full pl-16 pr-4 py-4 bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        disabled={!paymentMethod?.currentMethod}
+                      />
+                      <div className="absolute right-3 top-3 text-sm text-gray-500 dark:text-gray-400">
+                        Min: {formatRwf(MINIMUM_WITHDRAWAL)}
+                      </div>
+                    </div>
+                    
+                    {formData.amount && (
+                      <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                        <div className="flex justify-between">
+                          <span>Amount to receive:</span>
+                          <span className="font-medium text-green-600 dark:text-green-400">
+                            {formatRwf(parseFloat(formData.amount))}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Notes */}
+                  <div className="space-y-3">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      name="notes"
+                      value={formData.notes}
+                      onChange={handleChange}
+                      placeholder="Add any special instructions or notes for this withdrawal..."
+                      rows="3"
+                      className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900/50 border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                      disabled={!paymentMethod?.currentMethod}
+                    />
+                  </div>
+
+                  {/* Processing Information */}
+                  <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-xl p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <h3 className="font-medium text-blue-800 dark:text-blue-300">Processing Information</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div className="flex items-center gap-3">
+                        <Clock className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        <div>
+                          <p className="font-medium text-gray-700 dark:text-gray-300">Processing Time</p>
+                          <p className="text-gray-600 dark:text-gray-400">immediately</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                        <div>
+                          <p className="font-medium text-gray-700 dark:text-gray-300">Business Days</p>
+                          <p className="text-gray-600 dark:text-gray-400">Monday - Friday</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={submitting || !paymentMethod?.currentMethod || !formData.amount || parseFloat(formData.amount) < MINIMUM_WITHDRAWAL}
+                    className={`w-full py-4 px-6 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-3 ${
+                      !paymentMethod?.currentMethod || !formData.amount || parseFloat(formData.amount) < MINIMUM_WITHDRAWAL
+                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5'
+                    }`}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader className="w-5 h-5 animate-spin" />
+                        Processing Request...
+                      </>
+                    ) : !paymentMethod?.currentMethod ? (
+                      'Configure Payment Method First'
+                    ) : (
+                      <>
+                        Request Withdrawal
+                        <ArrowRight className="w-5 h-5" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Recent Withdrawals & Info */}
+          <div className="lg:col-span-1 space-y-6">
+            {/* Payment Method Card */}
+            {paymentMethod?.currentMethod && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg p-6">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  Payment Method Details
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">Current Method</p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
+                        {getPaymentMethodIcon(paymentMethod.currentMethod)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {getPaymentMethodLabel(paymentMethod.currentMethod)}
+                        </p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          {getPaymentMethodDetails()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate('/filmmaker/payment-method')}
+                    className="w-full text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 px-4 py-2 rounded-lg transition-all"
+                  >
+                    Update Payment Method
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Withdrawals */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-lg overflow-hidden">
+              <div className="p-6">
+                <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Recent Withdrawals</h3>
+                
+                {withdrawalHistory.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-12 h-12 mx-auto mb-3 text-gray-400 dark:text-gray-600">
+                      <Wallet className="w-full h-full" />
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">No withdrawal requests yet</p>
+                  </div>
                 ) : (
-                  <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-                    <p className="text-sm text-green-300">
-                      <span className="font-semibold">Payment Method:</span> {paymentMethod.currentMethod?.toUpperCase()}
-                    </p>
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                    {withdrawalHistory.slice(0, 5).map((withdrawal, index) => (
+                      <div 
+                        key={withdrawal.id || index} 
+                        className="p-3 rounded-lg bg-gray-50 dark:bg-gray-900/30 hover:bg-gray-100 dark:hover:bg-gray-900/50 transition-colors"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {formatRwf(withdrawal.amount || 0)}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              {withdrawal.payoutMethod || withdrawal.method}
+                            </p>
+                          </div>
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                            withdrawal.status === 'completed'
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                              : withdrawal.status === 'pending'
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                              : 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400'
+                          }`}>
+                            {withdrawal.status || 'pending'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {new Date(withdrawal.submittedAt || withdrawal.createdAt).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 )}
 
-                <p className="text-xs text-gray-400 mb-4">
-                  Minimum withdrawal: ${MINIMUM_WITHDRAWAL}
-                </p>
-
-                {/* Amount Input */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Withdrawal Amount *
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-3 text-gray-400">$</span>
-                    <input
-                      type="number"
-                      name="amount"
-                      value={formData.amount}
-                      onChange={handleChange}
-                      placeholder="0.00"
-                      step="0.01"
-                      min={MINIMUM_WITHDRAWAL}
-                      max={stats?.availableBalance || 0}
-                      className="w-full pl-8 pr-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
-                  {formData.amount && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      You will receive: ${formatCurrency(parseFloat(formData.amount) * 0.95)} (after 5% fee)
-                    </p>
-                  )}
-                </div>
-
-                {/* Withdrawal Method */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Withdrawal Method *
-                  </label>
-                  <select
-                    name="withdrawalMethod"
-                    value={formData.withdrawalMethod}
-                    onChange={handleChange}
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                {withdrawalHistory.length > 0 && (
+                  <button
+                    onClick={() => navigate('/filmmaker/withdrawal-history')}
+                    className="w-full mt-4 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 px-4 py-2 rounded-lg transition-all"
                   >
-                    <option value="momo">MoMo - Mobile Money (1-2 business days)</option>
-                    <option value="bank">Bank Transfer (5-7 business days)</option>
-                    <option value="stripe">Stripe (1-2 business days)</option>
-                  </select>
-                </div>
-
-                {/* Notes */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    name="notes"
-                    value={formData.notes}
-                    onChange={handleChange}
-                    placeholder="Add any notes about this withdrawal request..."
-                    rows="3"
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                {/* Terms & Conditions */}
-                <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6 text-sm text-blue-200">
-                  <p className="font-semibold mb-2">Processing Information:</p>
-                  <ul className="list-disc list-inside space-y-1 text-xs">
-                    <li>Withdrawals are processed on business days only</li>
-                    <li>A 5% fee is deducted from your withdrawal amount</li>
-                    <li>Minimum withdrawal is ${MINIMUM_WITHDRAWAL}</li>
-                    <li>Processing time depends on your selected method (1-7 business days)</li>
-                  </ul>
-                </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={submitting || !paymentMethod?.currentMethod || !(finance?.balance?.pendingBalance || stats?.availableBalance)}
-                  className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-blue-600 disabled:opacity-50 text-black px-6 py-3 rounded-lg font-semibold transition-all flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader className="w-5 h-5 animate-spin" />
-                      Processing...
-                    </>
-                  ) : !paymentMethod?.currentMethod ? (
-                    <>
-                      Configure Payment Method First
-                    </>
-                  ) : (
-                    <>
-                      Request Withdrawal
-                      <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </button>
+                    View Complete History
+                  </button>
+                )}
               </div>
-            </form>
-          </div>
-
-          {/* Recent Withdrawals Sidebar */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-6">
-              <h3 className="text-lg font-semibold mb-4">Recent Withdrawals</h3>
-
-              {withdrawalHistory.length === 0 ? (
-                <p className="text-sm text-gray-400">No withdrawal requests yet</p>
-              ) : (
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {withdrawalHistory.slice(0, 5).map((withdrawal) => (
-                    <div key={withdrawal._id} className="pb-3 border-b border-gray-700 last:border-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <p className="font-semibold text-white">${formatCurrency(withdrawal.amount || 0)}</p>
-                        <span className={`text-xs px-2 py-1 rounded-full ${
-                          withdrawal.status === 'completed'
-                            ? 'bg-green-500/20 text-green-400'
-                            : withdrawal.status === 'pending'
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : 'bg-blue-500/20 text-blue-400'
-                        }`}>
-                          {withdrawal.status}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400">
-                        {new Date(withdrawal.createdAt).toLocaleDateString()}
-                      </p>
-                      <p className="text-xs text-gray-500">{withdrawal.method}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button
-                onClick={() => navigate('/filmmaker/withdrawal-history')}
-                className="w-full mt-4 text-sm text-blue-400 hover:text-blue-300 border border-blue-500/30 hover:border-blue-500/50 px-3 py-2 rounded-lg transition-all"
-              >
-                View Full History
-              </button>
             </div>
 
-            {/* Setup Payment Method Alert */}
-            {!stats?.paymentMethodSet && (
-              <div className="mt-6 bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
-                <p className="text-sm font-semibold text-orange-200 mb-3">Setup Required</p>
-                <p className="text-xs text-orange-100 mb-4">
-                  You need to set up a payment method before requesting withdrawals.
-                </p>
-                <button
-                  onClick={() => navigate('/filmmaker/payment-method')}
-                  className="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm px-3 py-2 rounded-lg font-semibold transition-all"
-                >
-                  Set Payment Method
-                </button>
+            {/* Info Card */}
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Shield className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <h3 className="font-semibold text-blue-800 dark:text-blue-300">Secure Withdrawal</h3>
               </div>
-            )}
+              <ul className="space-y-3 text-sm text-blue-700 dark:text-blue-300">
+                <li className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full mt-1.5"></div>
+                  <span>All withdrawals are processed through secure payment gateways</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full mt-1.5"></div>
+                  <span>Your funds are protected by industry-standard encryption</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full mt-1.5"></div>
+                  <span>Email notifications sent for all withdrawal activities</span>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Add CSS animations */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

@@ -24,7 +24,7 @@ function MovieAnalytics() {
         <div className="text-center">
           <p className="text-gray-400 mb-4">Movie not found</p>
           <button
-            onClick={() => navigate('/admin/movies')}
+            onClick={() => navigate('/dashboard/filmmaker')}
             className="bg-blue-500 hover:bg-blue-600 text-black px-6 py-2 rounded-lg font-semibold"
           >
             Go Back

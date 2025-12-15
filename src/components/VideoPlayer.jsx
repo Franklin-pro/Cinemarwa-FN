@@ -7,7 +7,7 @@ function VideoPlayer() {
   const navigate = useNavigate();
 
   // Get the video URL from the state or query parameter
-  const videoUrl = location.state?.videoUrl;
+  const videoUrl = location.state?.streamingUrl || new URLSearchParams(location.search).get('streamingUrl');
 
   if (!videoUrl) {
     return (

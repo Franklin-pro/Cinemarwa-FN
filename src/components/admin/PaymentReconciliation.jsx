@@ -45,7 +45,7 @@ function PaymentReconciliation() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Revenue"
-          value={`$${(stats.totalRevenue || 0).toLocaleString('en-US', {
+          value={`RWF ${(stats.totalRevenue || 0).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`}
@@ -60,7 +60,7 @@ function PaymentReconciliation() {
         />
         <StatCard
           title="Platform Fee"
-          value={`$${(stats.platformFee || 0).toLocaleString('en-US', {
+          value={`RWF ${(stats.platformFee || 0).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`}
@@ -68,7 +68,7 @@ function PaymentReconciliation() {
         />
         <StatCard
           title="Filmmaker Payouts"
-          value={`$${(stats.filmmmakerPayouts || 0).toLocaleString('en-US', {
+          value={`RWF ${(stats.filmmmakerPayouts || 0).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`}
@@ -91,7 +91,7 @@ function PaymentReconciliation() {
                     <p className="text-sm text-gray-400">{method.transactions} transactions</p>
                   </div>
                   <p className="text-lg font-bold">
-                    ${method.amount.toLocaleString('en-US', {
+                    RWF {method.amount.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
@@ -121,7 +121,7 @@ function PaymentReconciliation() {
                     </div>
                   </div>
                   <p className="text-lg font-bold">
-                    ${filmmaker.earnings.toLocaleString('en-US', {
+                    RWF{filmmaker.earnings.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
@@ -151,7 +151,7 @@ function PaymentReconciliation() {
                 </div>
                 <div className="text-right">
                   <p className="text-lg font-bold">
-                    ${payout.amount.toLocaleString('en-US', {
+                    RWF {payout.amount.toLocaleString('en-US', {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
@@ -173,7 +173,7 @@ function PaymentReconciliation() {
           <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
             <p className="text-gray-400 text-sm mb-2">Reconciled Amount</p>
             <p className="text-2xl font-bold">
-              ${(stats.reconciledAmount || 0).toLocaleString('en-US', {
+              RWF {(stats.reconciledAmount || 0).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -182,7 +182,7 @@ function PaymentReconciliation() {
           <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
             <p className="text-gray-400 text-sm mb-2">Unreconciled Amount</p>
             <p className="text-2xl font-bold text-yellow-400">
-              ${(stats.unreconciledAmount || 0).toLocaleString('en-US', {
+              RWF {(stats.unreconciledAmount || 0).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}

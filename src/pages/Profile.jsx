@@ -37,7 +37,7 @@ function Profile() {
             </div>
             <div>
               <h2 className="text-2xl font-bold">
-                {user.firstName} {user.lastName}
+                {user.name}
               </h2>
               <p className="text-gray-400 capitalize">{user.role}</p>
             </div>

@@ -27,6 +27,11 @@ import ProtectedRoute from './components/ProtectedRoute';
 import PaymentMethodSetup from './pages/filmmaker/PaymentMethodSetup';
 import WithdrawalRequest from './pages/filmmaker/WithdrawalRequest';
 import WithdrawalHistory from './pages/filmmaker/WithdrawalHistory';
+import UpgradePage from './pages/UpgradePage';
+
+// Import AdminDashboard component if needed
+import AdminDashboard from './pages/dashboard/FilmmakerDashboard';
+import FilmmakerSeriesEpisodes from './pages/filmmaker/FilmmakerSeriesEpisodes';
 
 // Home component that routes based on auth status
 function HomePage() {
@@ -58,11 +63,15 @@ function DashboardRouter() {
 // Wrapper component to use hooks within Router context
 function AppContent() {
   const location = useLocation();
+  const { user } = useSelector((state) => state.auth);
 
   // Determine if navbar should be hidden based on route
   const isDashboardRoute = location.pathname.startsWith('/dashboard') ||
                            location.pathname.startsWith('/filmmaker') ||
                            location.pathname.startsWith('/admin');
+
+  // Determine if footer should be hidden
+  const shouldHideFooter = user && ["filmmaker", "admin"].includes(user?.role);
 
   return (
     <>
@@ -71,6 +80,7 @@ function AppContent() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/upgrade" element={<UpgradePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/auth/callback" element={<GoogleCallback />} />
@@ -108,6 +118,14 @@ function AppContent() {
             element={
               <ProtectedRoute>
                 <MovieWatch />
+              </ProtectedRoute>
+            }
+          />
+                <Route
+            path="/filmmaker/series/:seriesId/episodes"
+            element={
+              <ProtectedRoute>
+                <FilmmakerSeriesEpisodes />
               </ProtectedRoute>
             }
           />
@@ -220,7 +238,9 @@ function AppContent() {
           />
         </Routes>
       </main>
-      <Footer />
+      
+      {/* Conditionally render footer - hide for filmmaker and admin */}
+      {!shouldHideFooter && <Footer />}
       <ScrollTop />
     </>
   );
@@ -237,7 +257,7 @@ function App() {
         </Router>
       </MovieProvider>
     </Provider>
-  )
+  );
 }
 
-export default App
+export default App;

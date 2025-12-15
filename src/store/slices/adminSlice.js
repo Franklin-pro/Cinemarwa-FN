@@ -46,7 +46,6 @@ export const fetchPendingFilmmakers = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const data = await adminAPI.getPendingFilmmakers();
-      console.log(' Pending Filmmakers Data:', data);
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch pending filmmakers');
@@ -54,24 +53,27 @@ export const fetchPendingFilmmakers = createAsyncThunk(
   }
 );
 
+// FIXED: Corrected parameter name from filmamakerId to filmmakerId
 export const approveFilmmakerAction = createAsyncThunk(
   'admin/approveFilmmaker',
-  async ({ filmamakerId, data }, { rejectWithValue }) => {
+  async ({ filmmakerId, data }, { rejectWithValue }) => {
     try {
-      const response = await adminAPI.approveFilmmaker(filmamakerId, data);
-      return response;
+      const response = await adminAPI.approveFilmmaker(filmmakerId, data);
+      return { response, filmmakerId, data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to approve filmmaker');
     }
   }
 );
 
+// FIXED: Corrected parameter name from filmamakerId to filmmakerId
 export const verifyFilmmakerBankAction = createAsyncThunk(
   'admin/verifyFilmmakerBank',
-  async ({ filmamakerId, data }, { rejectWithValue }) => {
+  async ({ filmmakerId, data }, { rejectWithValue }) => {
     try {
-      const response = await adminAPI.verifyFilmmakerBank(filmamakerId, data);
-      return response;
+      console.log('Thunk: Verifying filmmaker bank', { filmmakerId, data });
+      const response = await adminAPI.verifyFilmmakerBank(filmmakerId, data);
+      return { response, filmmakerId, data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to verify bank');
     }
@@ -96,7 +98,7 @@ export const blockUserAction = createAsyncThunk(
   async ({ userId, reason }, { rejectWithValue }) => {
     try {
       const response = await adminAPI.blockUser(userId, reason);
-      return response;
+      return { response, userId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to block user');
     }
@@ -108,7 +110,7 @@ export const unblockUserAction = createAsyncThunk(
   async (userId, { rejectWithValue }) => {
     try {
       const response = await adminAPI.unblockUser(userId);
-      return response;
+      return { response, userId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to unblock user');
     }
@@ -120,7 +122,7 @@ export const deleteUserAction = createAsyncThunk(
   async (userId, { rejectWithValue }) => {
     try {
       const response = await adminAPI.deleteUser(userId);
-      return response;
+      return { response, userId };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete user');
     }
@@ -145,7 +147,7 @@ export const approveMovieAction = createAsyncThunk(
   async ({ movieId, data }, { rejectWithValue }) => {
     try {
       const response = await adminAPI.approveMovie(movieId, data);
-      return response;
+      return { response, movieId, data };
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to approve movie');
     }
@@ -157,7 +159,7 @@ export const fetchFlaggedContent = createAsyncThunk(
   async (type = 'all', { rejectWithValue }) => {
     try {
       const data = await adminAPI.getFlaggedContent(type);
-      return data.flaggedMovies;
+      return data.flaggedMovies || data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch flagged content');
     }
@@ -178,7 +180,6 @@ export const fetchPaymentReconciliation = createAsyncThunk(
 );
 
 // ====== SLICE ======
-
 const adminSlice = createSlice({
   name: 'admin',
   initialState: {
@@ -204,6 +205,7 @@ const adminSlice = createSlice({
     loading: false,
     error: null,
     successMessage: null,
+    approvingId: null, // Track which filmmaker is being approved
   },
   reducers: {
     clearError: (state) => {
@@ -211,6 +213,9 @@ const adminSlice = createSlice({
     },
     clearSuccessMessage: (state) => {
       state.successMessage = null;
+    },
+    setApprovingId: (state, action) => {
+      state.approvingId = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -250,7 +255,7 @@ const adminSlice = createSlice({
       })
       .addCase(fetchFilmmakers.fulfilled, (state, action) => {
         state.loading = false;
-        state.filmmakers = action.payload.data || [];
+        state.filmmakers = action.payload.data || action.payload || [];
       })
       .addCase(fetchFilmmakers.rejected, (state, action) => {
         state.loading = false;
@@ -263,7 +268,7 @@ const adminSlice = createSlice({
       })
       .addCase(fetchPendingFilmmakers.fulfilled, (state, action) => {
         state.loading = false;
-        state.pendingFilmmakers = action.payload.data || [];
+        state.pendingFilmmakers = action.payload.data || action.payload || [];
       })
       .addCase(fetchPendingFilmmakers.rejected, (state, action) => {
         state.loading = false;
@@ -271,13 +276,31 @@ const adminSlice = createSlice({
       });
 
     builder
+      .addCase(approveFilmmakerAction.pending, (state, action) => {
+        state.approvingId = action.meta.arg.filmmakerId;
+        state.loading = true;
+      })
       .addCase(approveFilmmakerAction.fulfilled, (state, action) => {
+        state.loading = false;
+        state.approvingId = null;
         state.successMessage = 'Filmmaker approved successfully';
+        
+        // Remove approved filmmaker from pending list
+        const filmmakerId = action.payload.filmmakerId;
         state.pendingFilmmakers = state.pendingFilmmakers.filter(
-          (f) => f._id !== action.payload.filmmaker?._id
+          (f) => f._id !== filmmakerId && f.id !== filmmakerId
+        );
+        
+        // Update in main filmmakers list if exists
+        state.filmmakers = state.filmmakers.map((f) => 
+          (f._id === filmmakerId || f.id === filmmakerId) 
+            ? { ...f, status: 'approved', approvedAt: new Date().toISOString() }
+            : f
         );
       })
       .addCase(approveFilmmakerAction.rejected, (state, action) => {
+        state.loading = false;
+        state.approvingId = null;
         state.error = action.payload;
       });
 
@@ -288,7 +311,7 @@ const adminSlice = createSlice({
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.loading = false;
-        state.users = action.payload.data || [];
+        state.users = action.payload.data || action.payload || [];
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.loading = false;
@@ -298,8 +321,11 @@ const adminSlice = createSlice({
     builder
       .addCase(blockUserAction.fulfilled, (state, action) => {
         state.successMessage = 'User blocked successfully';
+        const userId = action.payload.userId;
         state.users = state.users.map((u) =>
-          u._id === action.payload.user?._id ? action.payload.user : u
+          (u._id === userId || u.id === userId) 
+            ? { ...u, status: 'blocked', blockedAt: new Date().toISOString() }
+            : u
         );
       })
       .addCase(blockUserAction.rejected, (state, action) => {
@@ -309,8 +335,11 @@ const adminSlice = createSlice({
     builder
       .addCase(unblockUserAction.fulfilled, (state, action) => {
         state.successMessage = 'User unblocked successfully';
+        const userId = action.payload.userId;
         state.users = state.users.map((u) =>
-          u._id === action.payload.user?._id ? action.payload.user : u
+          (u._id === userId || u.id === userId) 
+            ? { ...u, status: 'active', blockedAt: null }
+            : u
         );
       })
       .addCase(unblockUserAction.rejected, (state, action) => {
@@ -320,7 +349,10 @@ const adminSlice = createSlice({
     builder
       .addCase(deleteUserAction.fulfilled, (state, action) => {
         state.successMessage = 'User deleted successfully';
-        state.users = state.users.filter((u) => u._id !== action.meta.arg);
+        const userId = action.payload.userId;
+        state.users = state.users.filter((u) => 
+          u._id !== userId && u.id !== userId
+        );
       })
       .addCase(deleteUserAction.rejected, (state, action) => {
         state.error = action.payload;
@@ -333,7 +365,7 @@ const adminSlice = createSlice({
       })
       .addCase(fetchPendingMovies.fulfilled, (state, action) => {
         state.loading = false;
-        state.pendingMovies = action.payload.data || [];
+        state.pendingMovies = action.payload.data || action.payload || [];
       })
       .addCase(fetchPendingMovies.rejected, (state, action) => {
         state.loading = false;
@@ -343,8 +375,9 @@ const adminSlice = createSlice({
     builder
       .addCase(approveMovieAction.fulfilled, (state, action) => {
         state.successMessage = 'Movie approved successfully';
+        const movieId = action.payload.movieId;
         state.pendingMovies = state.pendingMovies.filter(
-          (m) => m._id !== action.payload.movie?._id
+          (m) => m._id !== movieId && m.id !== movieId
         );
       })
       .addCase(approveMovieAction.rejected, (state, action) => {
@@ -380,5 +413,5 @@ const adminSlice = createSlice({
   },
 });
 
-export const { clearError, clearSuccessMessage } = adminSlice.actions;
+export const { clearError, clearSuccessMessage, setApprovingId } = adminSlice.actions;
 export default adminSlice.reducer;

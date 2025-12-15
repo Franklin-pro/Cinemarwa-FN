@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
 const adminAPI = axios.create({
-  baseURL: `${API_URL}/admin`
+  baseURL: `${API_URL}/admin`,
 });
 
 // Add token to requests
@@ -40,16 +40,16 @@ export const getPendingFilmmakers = async () => {
   return response.data;
 };
 
-export const approveFilmmaker = async (filmamakerId, data) => {
-  const response = await adminAPI.patch(`/filmmakers/${filmamakerId}/approve`, data);
+// Wrong - has "filmamakerId" (missing 'm')
+export const approveFilmmaker = async (filmmakerId, data) => {
+  const response = await adminAPI.patch(`/filmmakers/${filmmakerId}/approve`, data);
   return response.data;
 };
 
-export const verifyFilmmakerBank = async (filmamakerId, data) => {
-  const response = await adminAPI.patch(`/filmmakers/${filmamakerId}/verify-bank`, data);
+export const verifyFilmmakerBank = async (filmmakerId, data) => {
+  const response = await adminAPI.patch(`/filmmakers/${filmmakerId}/verify-bank`, data);
   return response.data;
 };
-
 // ====== USER MANAGEMENT ======
 
 export const getAllUsers = async () => {
