@@ -121,11 +121,46 @@ export const handleGoogleCallback = createAsyncThunk(
 );
 
 export const logout = createAsyncThunk('/auth/logout', async () => {
+  try {
+    await authService.logout();
+  } catch (error) {
+    // ignore network errors for logout, still clear local storage
+  }
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('tempEmail');
+  localStorage.removeItem('deviceFingerprint');
+  localStorage.removeItem('deviceFingerprintHash');
   return null;
 });
+export const logoutAll = createAsyncThunk('/auth/logoutAll', async () => {
+  try {
+    await authService.logoutAll();
+  } catch (error) {
+    // ignore network errors for logoutAll, still clear local storage
+  }
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('tempEmail');
+  localStorage.removeItem('deviceFingerprint');
+  localStorage.removeItem('deviceFingerprintHash');
+  return null;
+});
+export const deleteAccount = createAsyncThunk('/auth/deleteAccount', async () => {
+  try {
+    await authService.deleteAccount();
+  } catch (error) {
+    // ignore network errors for deleteAccount, still clear local storage
+    console.error("Error deleting account:", error);
+  }
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('tempEmail');
+  localStorage.removeItem('deviceFingerprint');
+  localStorage.removeItem('deviceFingerprintHash');
+  return null;
+});
+
 
 // Slice
 const authSlice = createSlice({
@@ -223,10 +258,39 @@ const authSlice = createSlice({
       });
 
     // Logout
-    builder.addCase(logout.fulfilled, (state) => {
-      state.user = null;
-      state.token = null;
-    });
+    builder
+      .addCase(logout.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        // Optimistic UI update: clear user while logout request is in progress
+        state.user = null;
+        state.token = null;
+      })
+      .addCase(logout.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+      })
+      .addCase(logout.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Logout failed';
+      })
+      .addCase(logoutAll.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+        // Optimistic UI update: clear user while logoutAll request is in progress
+        state.user = null;
+        state.token = null;
+      })
+      .addCase(logoutAll.fulfilled, (state) => {
+        state.loading = false;
+        state.user = null;
+        state.token = null;
+      })
+      .addCase(logoutAll.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || 'Logout failed';
+      });
   },
 });
 

@@ -6,13 +6,14 @@ import {
   clearError,
   clearSuccessMessage,
 } from '../../store/slices/adminSlice';
-import { BarChart, Users, Film, AlertCircle, TrendingUp } from 'lucide-react';
+import { BarChart, Users, Film, AlertCircle, TrendingUp, Mail } from 'lucide-react';
 
 // Admin Dashboard Tabs
 import FilmmakerManagement from '../../components/admin/FilmmakerManagement';
 import UserManagement from '../../components/admin/UserManagement';
 import ContentModeration from '../../components/admin/ContentModeration';
 import PaymentReconciliation from '../../components/admin/PaymentReconciliation';
+import SubscriberManagement from '../../components/admin/SubscriberManagement';
 
 // Analytics Charts Components
 import {
@@ -23,7 +24,7 @@ import {
   AnalyticsSummary,
   FilmmakersSummaryTable,
 } from '../../components/admin/AnalyticsCharts';
-import { logout } from '../../store/slices/authSlice';
+import {  logoutAll } from '../../store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
 
 
@@ -38,7 +39,7 @@ function AdminDashboardPage() {
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await dispatch(logout());
+    await dispatch(logoutAll());
     navigate("/");
   };
 
@@ -99,6 +100,7 @@ function AdminDashboardPage() {
             { id: 'overview', label: 'Overview', icon: BarChart },
             { id: 'filmmakers', label: 'Filmmakers', icon: Film },
             { id: 'users', label: 'Users', icon: Users },
+            { id: 'subscribers', label: 'Subscribers', icon: Mail },
             { id: 'moderation', label: 'Content Moderation', icon: AlertCircle },
             { id: 'payments', label: 'Payments', icon: TrendingUp },
           ].map((tab) => {
@@ -133,6 +135,7 @@ function AdminDashboardPage() {
           )}
           {activeTab === 'filmmakers' && <FilmmakerManagement />}
           {activeTab === 'users' && <UserManagement />}
+          {activeTab === 'subscribers' && <SubscriberManagement />}
           {activeTab === 'moderation' && <ContentModeration />}
           {activeTab === 'payments' && <PaymentReconciliation />}
         </div>
@@ -194,7 +197,7 @@ function OverviewTab({ dashboard, analytics, analyticsPeriod, setAnalyticsPeriod
         />
         <MetricCard
           title="Total Revenue"
-          value={`$${typeof monthlyRevenue === 'number' ? monthlyRevenue.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0'}`}
+          value={`RWF ${typeof monthlyRevenue === 'number' ? monthlyRevenue.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '0'}`}
           change={revenueGrowth}
           icon="💰"
         />

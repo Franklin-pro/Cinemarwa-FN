@@ -141,7 +141,7 @@ export default function Payment() {
     const pollInterval = setInterval(async () => {
       try {
         const result = await dispatch(checkMoMoPaymentStatus(transactionId)).unwrap();
-        const status = result.data?.payment?.paymentStatus || result.status;
+        const status = result.status;
         if (status === "succeeded" || status === "SUCCESSFUL") {
           clearInterval(pollInterval);
           setLocalPaymentStatus("SUCCESSFUL");
@@ -247,7 +247,7 @@ export default function Payment() {
       
       const result = await dispatch(processMoMoPayment(payload)).unwrap();
       if (result.success && result.transactionId) {
-        const txId = result.data.transactionId;
+        const txId = result.transactionId;
         setTransactionId(txId);
         setProcessing(false);
         if (result.status === 'SUCCESSFUL') {

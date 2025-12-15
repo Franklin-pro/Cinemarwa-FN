@@ -1,15 +1,47 @@
-import { Facebook, Github, Instagram, TwitterIcon } from "lucide-react";
+import { Facebook, Github, Instagram, TwitterIcon, Mail, CheckCircle, AlertCircle } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
+import { subscribeService } from "../services/api/subscribe";
 
 function Footer() {
   const [userIsLoggedIn, setUserIsLoggedIn] = useState(false);
   const { user } = useSelector((state) => state.auth);
+  const [subscribeEmail, setSubscribeEmail] = useState('');
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [subscribeMessage, setSubscribeMessage] = useState('');
+  const [subscribeError, setSubscribeError] = useState('');
   
   // detect login state
   useEffect(() => {
     setUserIsLoggedIn(!!(user && user.token));
   }, [user]);
+
+  const handleSubscribe = async (e) => {
+    e.preventDefault();
+    setSubscribeLoading(true);
+    setSubscribeMessage('');
+    setSubscribeError('');
+
+    try {
+      await subscribeService.subscribeCinemaRwa({
+        email: subscribeEmail,
+        preferences: {
+          newMovies: true,
+          promotions: true,
+          weeklyDigest: true,
+        },
+      });
+      setSubscribeMessage('✓ Successfully subscribed to our newsletter!');
+      setSubscribeEmail('');
+      setTimeout(() => setSubscribeMessage(''), 5000);
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'Failed to subscribe';
+      setSubscribeError(errorMsg);
+      setTimeout(() => setSubscribeError(''), 5000);
+    } finally {
+      setSubscribeLoading(false);
+    }
+  };
 
   // 🔥 hide footer if user is filmmaker or admin
   if (userIsLoggedIn && ["filmmaker", "admin"].includes(user?.role)) {
@@ -145,16 +177,45 @@ function Footer() {
             <p className="text-sm mb-4">
               Stay up to date with the latest movies and news
             </p>
-            <form action="" className="space-y-3">
+            <form onSubmit={handleSubscribe} className="space-y-3">
               <div className="relative">
                 <input
-                  type="text"
+                  type="email"
                   placeholder="Enter your email"
-                  className="w-full bg-neutral-800 border-neutral-700 text-white px-4 py-2 rounded-lg focus:outline focus:ring-2 text-sm"
+                  value={subscribeEmail}
+                  onChange={(e) => setSubscribeEmail(e.target.value)}
+                  required
+                  className="w-full bg-neutral-800 border border-neutral-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
-              <button className="bg-blue-500 w-full hover:bg-blue-700 text-white py-2 rounded-lg transition-all text-sm">
-                Subscribe
+              {subscribeMessage && (
+                <div className="flex items-center gap-2 text-green-400 text-sm">
+                  <CheckCircle className="w-4 h-4" />
+                  {subscribeMessage}
+                </div>
+              )}
+              {subscribeError && (
+                <div className="flex items-center gap-2 text-blue-400 text-sm">
+                  <AlertCircle className="w-4 h-4" />
+                  {subscribeError}
+                </div>
+              )}
+              <button 
+                type="submit"
+                disabled={subscribeLoading}
+                className="bg-blue-500 w-full hover:bg-blue-700 disabled:bg-blue-600 disabled:opacity-50 text-white py-2 rounded-lg transition-all text-sm font-semibold flex items-center justify-center gap-2"
+              >
+                {subscribeLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Subscribing...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Subscribe
+                  </>
+                )}
               </button>
             </form>
           </div>

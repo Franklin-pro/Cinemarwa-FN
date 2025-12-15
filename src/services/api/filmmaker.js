@@ -33,7 +33,7 @@ export const filmmmakerService = {
 
   // ====== FINANCIAL ======
   getFinancialSummary: () => filmmmakerAPI.get('/finance'),
-  requestWithdrawal: (amount) => filmmmakerAPI.post('/withdraw', { amount }),
+  // requestWithdrawal: (amount) => filmmmakerAPI.post('/withdrawals/request', { amount }),
   getWithdrawalHistory: () => filmmmakerAPI.get('/withdrawals'),
 
   // ====== MOVIE MANAGEMENT ======

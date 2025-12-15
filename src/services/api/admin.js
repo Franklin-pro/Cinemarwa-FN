@@ -3,7 +3,7 @@ import axios from 'axios';
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
 const adminAPI = axios.create({
-  baseURL: `${API_URL}/admin`
+  baseURL: `${API_URL}/admin`,
 });
 
 // Add token to requests

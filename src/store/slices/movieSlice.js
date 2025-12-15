@@ -151,6 +151,20 @@ export const rateMovie = createAsyncThunk(
     }
   }
 );
+export const deleteMovie = createAsyncThunk(
+  'movies/deleteMovie',
+  async (movieId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`${API_URL}/movies/${movieId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete movie');
+    }
+  }
+);
 
 // Slice
 const movieSlice = createSlice({
@@ -314,6 +328,18 @@ const movieSlice = createSlice({
         state.loading = false;
       })
       .addCase(rateMovie.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+      builder
+      .addCase(deleteMovie.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(deleteMovie.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userMovies = state.userMovies.filter(movie => movie.id !== action.meta.arg);
+      })
+      .addCase(deleteMovie.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

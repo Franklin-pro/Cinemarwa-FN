@@ -29,7 +29,10 @@ function MovieDetails({ movieId, onclose }) {
     isPlaying,
     () => setShowAuthPrompt(true)
   );
-
+          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(movieId);
+        const isMongoId = /^[a-f0-9]{24}$/.test(movieId);
+const isTmdbId = /^\d+$/.test(movieId);
+const isBackendMovie = isUuid || isMongoId;
   useEffect(() => {
     if (!movieId) return;
     
@@ -131,16 +134,36 @@ function MovieDetails({ movieId, onclose }) {
 
   // Check if user has access to the content
   const hasAccess = movie?.userAccess?.hasAccess === true;
+  console.log("accessssss",movie?.userAccess);
   const requiresPurchase = movie?.userAccess?.requiresPurchase === true;
 
-  const handleWatchNow = async () => {
-    try {
-      if (!hasAccess) {
+const handleWatchNow = async () => {
+  try {
+    // TMDB = always free trailer
+    if (isTmdbId) {
+      const videos = await getMovieVideos(movieId);
+      const trailer = videos.find(
+        (video) => video.type === "Trailer" && video.site === "YouTube"
+      );
+
+      if (trailer) {
+        setVideoUrl(`https://www.youtube.com/embed/${trailer.key}?autoplay=1`);
+        setIsPlaying(true);
+        return; // 👈 Skip guest 60-second logic
+      }
+
+      alert("Trailer not available.");
+      return;
+    }
+
+    // Backend movie → apply access rules + 60 seconds guest rules
+    if (isBackendMovie) {
+        if (!hasAccess) {
         if (!token) {
           navigate('/login', { state: { from: `/movie/${movieId}` } });
           return;
         }
-        
+
         if (requiresPurchase) {
           handlePurchase();
           return;
@@ -150,36 +173,18 @@ function MovieDetails({ movieId, onclose }) {
       if (movie?.videoUrl) {
         setVideoUrl(movie.videoUrl);
         setIsPlaying(true);
-      } else {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(movieId);
-        const isMongoId = /^[a-f0-9]{24}$/.test(movieId);
-        const isTmdbId = /^\d+$/.test(movieId);
-        
-        if (isUuid || isMongoId) {
-          if (movie?.trailerUrl) {
-            setVideoUrl(movie.trailerUrl);
-            setIsPlaying(true);
-          } else {
-            alert("Trailer not available for this movie.");
-          }
-        } else if (isTmdbId) {
-          const videos = await getMovieVideos(movieId);
-          const trailer = videos.find(
-            (video) => video.type === "Trailer" && video.site === "YouTube"
-          );
-          if (trailer) {
-            setVideoUrl(`https://www.youtube.com/embed/${trailer.key}?autoplay=1`);
-            setIsPlaying(true);
-          } else {
-            alert("Trailer not available.");
-          }
-        }
+      } else if (movie?.trailerUrl) {
+        setVideoUrl(movie.trailerUrl);
+        setIsPlaying(true);
       }
-    } catch (error) {
-      console.error("Failed to fetch video:", error);
-      alert("Failed to load video.");
+      return;
     }
-  };
+  } catch (error) {
+    console.error(error);
+    alert("Failed to load video.");
+  }
+};
+
 
   const handleEpisodeClick = (episode) => {
     if (hasAccess) {

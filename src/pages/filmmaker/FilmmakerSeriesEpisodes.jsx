@@ -147,7 +147,7 @@ function FilmmakerSeriesEpisodes() {
                   <div>
                     <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Revenue</p>
                     <p className={`font-medium ${darkMode ? "text-white" : "text-gray-900"}`}>
-                      ${formatCurrency(series.totalRevenue || 0)}
+                      RWF {formatCurrency(series.totalRevenue || 0)}
                     </p>
                   </div>
                   <div>
@@ -272,7 +272,7 @@ function FilmmakerSeriesEpisodes() {
                           <div className="flex items-center gap-2">
                             <DollarSign className={`w-4 h-4 ${darkMode ? "text-gray-400" : "text-gray-500"}`} />
                             <span className={`text-sm ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
-                              ${formatCurrency(episode.totalRevenue || 0)} revenue
+                              RWF {formatCurrency(episode.totalRevenue || 0)} revenue
                             </span>
                           </div>
                           <div className="flex items-center gap-2">

@@ -275,7 +275,7 @@ function PaymentMethodSetup() {
               </label>
 
               {/* Bank Transfer */}
-              <label className="flex items-start gap-3 p-4 border border-gray-700 rounded-lg hover:border-gray-600 cursor-pointer transition"
+              {/* <label className="flex items-start gap-3 p-4 border border-gray-700 rounded-lg hover:border-gray-600 cursor-pointer transition"
                 style={{
                   backgroundColor: formData.paymentMethod === 'bank_transfer' ? 'rgba(234, 179, 8, 0.1)' : 'transparent',
                   borderColor: formData.paymentMethod === 'bank_transfer' ? 'rgba(234, 179, 8, 0.5)' : 'inherit',
@@ -293,10 +293,10 @@ function PaymentMethodSetup() {
                   <p className="font-semibold text-white">Bank Transfer</p>
                   <p className="text-xs text-gray-400">Direct bank_transfer account deposit (ACH, Wire Transfer)</p>
                 </div>
-              </label>
+              </label> */}
 
               {/* Stripe */}
-              <label className="flex items-start gap-3 p-4 border border-gray-700 rounded-lg hover:border-gray-600 cursor-pointer transition"
+              {/* <label className="flex items-start gap-3 p-4 border border-gray-700 rounded-lg hover:border-gray-600 cursor-pointer transition"
                 style={{
                   backgroundColor: formData.paymentMethod === 'stripe' ? 'rgba(234, 179, 8, 0.1)' : 'transparent',
                   borderColor: formData.paymentMethod === 'stripe' ? 'rgba(234, 179, 8, 0.5)' : 'inherit',
@@ -314,13 +314,13 @@ function PaymentMethodSetup() {
                   <p className="font-semibold text-white">Stripe</p>
                   <p className="text-xs text-gray-400">Connect your Stripe account for payouts</p>
                 </div>
-              </label>
+              </label> */}
             </div>
           </div>
 
           {/* Bank Transfer Form */}
           {formData.paymentMethod === 'bank_transfer' && (
-            <div className="bg-gray-800/40 border border-gray-700 rounded-lg p-6 space-y-4">
+            <div className="bg-gray-800/40 dia border border-gray-700 rounded-lg p-6 space-y-4">
               <h3 className="font-semibold text-white mb-4">Bank Account Details</h3>
 
               <div className="grid md:grid-cols-2 gap-4">

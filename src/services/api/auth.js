@@ -47,6 +47,16 @@ export const authService = {
         return authAPI.post('/logout').then(() => {
             localStorage.removeItem('token');
             localStorage.removeItem('user');
+            localStorage.removeItem('deviceFingerprint');
+            localStorage.removeItem('fingerprintTimestamp');
+        });
+    },
+    logoutAll : () => {
+        return authAPI.post('/logout-all').then(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('deviceFingerprint');
+            localStorage.removeItem('fingerprintTimestamp');
         });
     },
     
@@ -55,8 +65,6 @@ export const authService = {
     getActiveDevices: () => authAPI.get('/devices'),
     
     removeDevice: (deviceId) => authAPI.delete(`/devices/${deviceId}`),
-    
-    logoutAll: () => authAPI.post('/logout-all'),
 };
 
 export default authService;
