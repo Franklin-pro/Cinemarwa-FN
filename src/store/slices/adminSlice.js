@@ -16,6 +16,29 @@ export const fetchDashboard = createAsyncThunk(
   }
 );
 
+export const filmmakerPerformance = createAsyncThunk(
+  '/filmmakers/performance',
+  async (period = 'month', { rejectWithValue }) => {
+    try {
+      const data = await adminAPI.getFilmmakerPerformance(period);
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch analytics');
+    }
+  }
+);
+export const recentlyActivities = createAsyncThunk(
+  '/admin/recent-activities',
+  async (period = 'month', { rejectWithValue }) => {
+    try {
+      const data = await adminAPI.recentActivities(period);
+      return data; // RETURN FULL RESPONSE
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch activities');
+    }
+  }
+);
+
 export const fetchAnalytics = createAsyncThunk(
   'admin/fetchAnalytics',
   async (period = 'month', { rejectWithValue }) => {
@@ -201,6 +224,12 @@ const adminSlice = createSlice({
     // Payments
     paymentReconciliation: null,
 
+    // Activities - ADD THIS
+    activities: null,
+
+    // Filmmaker Performance - ADD THIS
+    filmmakersPerformance: null,
+
     // UI States
     loading: false,
     error: null,
@@ -244,6 +273,36 @@ const adminSlice = createSlice({
         state.analytics = action.payload;
       })
       .addCase(fetchAnalytics.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // Filmmaker Performance
+    builder
+      .addCase(filmmakerPerformance.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(filmmakerPerformance.fulfilled, (state, action) => {
+        state.loading = false;
+        state.filmmakersPerformance = action.payload;
+      })
+      .addCase(filmmakerPerformance.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+    // Recent Activities - FIXED: Store in correct property
+    builder
+      .addCase(recentlyActivities.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(recentlyActivities.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activities = action.payload; // FIXED: Store in activities, not filmmakersPerformance
+      })
+      .addCase(recentlyActivities.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

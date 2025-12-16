@@ -20,8 +20,13 @@ function PaymentReconciliation() {
     );
   }
 
-  const stats = paymentReconciliation;
 
+
+  const stats = paymentReconciliation;
+  const totalFilmmakerPayout = (stats.filmmakerPayouts || []).reduce(
+  (sum, item) => sum + Number(item.payoutAmount),
+  0
+);
   return (
     <div className="space-y-6">
       {/* Period Selector */}
@@ -45,7 +50,7 @@ function PaymentReconciliation() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Revenue"
-          value={`RWF ${(stats.totalRevenue || 0).toLocaleString('en-US', {
+          value={`RWF ${(stats.netRevenue || 0).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`}
@@ -54,13 +59,13 @@ function PaymentReconciliation() {
         />
         <StatCard
           title="Transactions"
-          value={stats.totalTransactions || 0}
+          value={stats.transactionCount || 0}
           icon={<FileText className="w-8 h-8" />}
           change={stats.transactionChange}
         />
         <StatCard
           title="Platform Fee"
-          value={`RWF ${(stats.platformFee || 0).toLocaleString('en-US', {
+          value={`RWF ${(stats.platformEarnings || 0).toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`}
@@ -68,7 +73,7 @@ function PaymentReconciliation() {
         />
         <StatCard
           title="Filmmaker Payouts"
-          value={`RWF ${(stats.filmmmakerPayouts || 0).toLocaleString('en-US', {
+          value={`RWF ${totalFilmmakerPayout.toLocaleString('en-US', {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}`}
@@ -80,7 +85,7 @@ function PaymentReconciliation() {
       {/* Detailed Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Payment Methods */}
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+        {/* <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
           <h3 className="text-xl font-bold mb-6">Payment Methods</h3>
           <div className="space-y-4">
             {stats.paymentMethods && stats.paymentMethods.length > 0 ? (
@@ -102,10 +107,10 @@ function PaymentReconciliation() {
               <p className="text-gray-400 text-center py-4">No payment data available</p>
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Top Filmmakers */}
-        <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+        {/* <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
           <h3 className="text-xl font-bold mb-6">Top Earning Filmmakers</h3>
           <div className="space-y-4">
             {stats.topFilmmmakers && stats.topFilmmmakers.length > 0 ? (
@@ -132,11 +137,11 @@ function PaymentReconciliation() {
               <p className="text-gray-400 text-center py-4">No filmmaker data available</p>
             )}
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Pending Payouts */}
-      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+      {/* <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
         <h3 className="text-xl font-bold mb-6">Pending Payouts</h3>
         <div className="space-y-4">
           {stats.pendingPayouts && stats.pendingPayouts.length > 0 ? (
@@ -164,33 +169,33 @@ function PaymentReconciliation() {
             <p className="text-gray-400 text-center py-8">No pending payouts</p>
           )}
         </div>
-      </div>
+      </div> */}
 
       {/* Reconciliation Status */}
       <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
-        <h3 className="text-xl font-bold mb-6">Reconciliation Status</h3>
+        <h3 className="text-xl font-bold mb-6">Revenue Status</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
-            <p className="text-gray-400 text-sm mb-2">Reconciled Amount</p>
+            <p className="text-gray-400 text-sm mb-2">total amount </p>
             <p className="text-2xl font-bold">
-              RWF {(stats.reconciledAmount || 0).toLocaleString('en-US', {
+              RWF {(stats.grossRevenue || 0).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </p>
           </div>
           <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
-            <p className="text-gray-400 text-sm mb-2">Unreconciled Amount</p>
+            <p className="text-gray-400 text-sm mb-2">MTN fee</p>
             <p className="text-2xl font-bold text-yellow-400">
-              RWF {(stats.unreconciledAmount || 0).toLocaleString('en-US', {
+              RWF {(stats.mtnGatewayFees || 0).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
             </p>
           </div>
           <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
-            <p className="text-gray-400 text-sm mb-2">Discrepancies</p>
-            <p className="text-2xl font-bold text-red-400">{stats.discrepancies || 0}</p>
+            <p className="text-gray-400 text-sm mb-2">net Revenue</p>
+            <p className="text-2xl font-bold text-green-400">{stats.netRevenue || 0}</p>
           </div>
         </div>
       </div>

@@ -26,6 +26,14 @@ export const getAnalytics = async (period = 'month') => {
   const response = await adminAPI.get(`/analytics?period=${period}`);
   return response.data;
 };
+export const getFilmmakerPerformance = async (period = 'month') => {
+  const response = await adminAPI.get(`/filmmakers/performance?period=${period}`);
+  return response.data;
+};
+export const recentActivities = async (period = 'month') =>{
+  const response = await adminAPI.get(`/recent-activities?period=${period}`)
+  return response.data
+}
 
 // ====== FILMMAKER MANAGEMENT ======
 
