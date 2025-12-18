@@ -2,6 +2,7 @@ import { Facebook, Github, Instagram, TwitterIcon, Mail, CheckCircle, AlertCircl
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { subscribeService } from "../services/api/subscribe";
+import cinemaLogo from "../assets/cinerwandaLogo.png";
 
 function Footer() {
   const [userIsLoggedIn, setUserIsLoggedIn] = useState(false);
@@ -55,12 +56,12 @@ function Footer() {
           <div>
             <a href="" className="inline-block mb-6">
               <span className="text-blue-500 text-2xl font-bold">
-                Cine<span className="text-white">Verse</span>
+                <img src={cinemaLogo} alt="logo" className=" w-32 h-16 object-cover" />
               </span>
             </a>
             <p className="mb-4 text-sm">
               cine verse is a movie website that provides users with a vast
-              collection of movies and TV shows from around the world. With a
+              collection of movies and TV shows from Rwanda. With a
               user-friendly interface and powerful search functionality, users
               can easily find their favorite movies and discover new ones.
             </p>

@@ -454,9 +454,9 @@ export function AnalyticsSummary({ data, period, isLoading = false }) {
         </div>
 
         {/* Total Revenue */}
-        <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30 rounded-lg p-4">
+        <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 border border-blue-500/30 rounded-lg p-4">
           <p className="text-gray-400 text-sm mb-2">Revenue</p>
-          <p className="text-3xl font-bold text-purple-400">
+          <p className="text-3xl font-bold text-blue-400">
             {formatCurrency(safeParseNumber(metrics.revenue || 0))}
           </p>
         </div>

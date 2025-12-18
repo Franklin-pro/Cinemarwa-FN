@@ -87,7 +87,6 @@ function MovieWatch() {
           try {
             const response = await moviesAPI.getMovieById(id);
             movieData = response.data.data;
-            console.log('✅ Backend movie found:', movieData?.title);
             
             // Check if user has access before getting streaming URL
             if (hasAccess || user?.role === 'admin') {
@@ -109,7 +108,6 @@ function MovieWatch() {
         } else if (isTmdbId) {
           // For TMDB movies
           movieData = await getTMDBMovieDetails(id);
-          console.log('✅ TMDB movie found:', movieData?.title);
           
           // For TMDB movies, we'll use trailer as preview
           // In production, you'd have actual streaming URLs

@@ -69,7 +69,6 @@ export const processSubscriptionMomoPayment = createAsyncThunk(
   async (paymentData, { rejectWithValue }) => {
     try {
       const response = await paymentsService.processSubscriptionMomoPayment(paymentData);
-      console.log('✅ Subscription MoMo response:', response.data);
       return response.data;
     } catch (error) {
       console.error('❌ Subscription MoMo Payment Error:', {
@@ -410,14 +409,12 @@ const paymentSlice = createSlice({
     // ====== PROCESS SUBSCRIPTION MOMO PAYMENT ======
     builder
       .addCase(processSubscriptionMomoPayment.pending, (state) => {
-        console.log('🔄 Subscription MoMo payment pending...');
         state.loading = true;
         state.error = null;
         state.success = false;
         state.polling = false;
       })
       .addCase(processSubscriptionMomoPayment.fulfilled, (state, action) => {
-        console.log('✅ Subscription MoMo payment fulfilled:', action.payload);
         state.loading = false;
         
         const response = action.payload;
@@ -447,7 +444,6 @@ const paymentSlice = createSlice({
         }
       })
       .addCase(processSubscriptionMomoPayment.rejected, (state, action) => {
-        console.log('❌ Subscription MoMo payment rejected:', action.payload);
         state.loading = false;
         
         // Handle error from rejectWithValue

@@ -1,23 +1,43 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createAction } from '@reduxjs/toolkit';
 import axios from 'axios';
+
+export const setUploadProgress = createAction('movies/setUploadProgress');
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
-// Async Thunks
+// ====== ASYNC THUNKS ======
+
 export const uploadMovie = createAsyncThunk(
   'movies/uploadMovie',
-  async (formData, { rejectWithValue }) => {
+  async (formData, { dispatch, rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/movies/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`,
-        },
-      });
+
+      const response = await axios.post(
+        `${API_URL}/movies/upload`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+          },
+          onUploadProgress: (event) => {
+            if (!event.total) return;
+
+            const percent = Math.round(
+              (event.loaded * 100) / event.total
+            );
+
+            dispatch(setUploadProgress(percent));
+          },
+        }
+      );
+
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Upload failed');
+      return rejectWithValue(
+        error.response?.data?.message || 'Upload failed'
+      );
     }
   }
 );
@@ -151,6 +171,7 @@ export const rateMovie = createAsyncThunk(
     }
   }
 );
+
 export const deleteMovie = createAsyncThunk(
   'movies/deleteMovie',
   async (movieId, { rejectWithValue }) => {
@@ -166,56 +187,59 @@ export const deleteMovie = createAsyncThunk(
   }
 );
 
-// Slice
+// ====== SLICE ======
 const movieSlice = createSlice({
   name: 'movies',
   initialState: {
     userMovies: [],
-    filmmakerSeries: [],
-    seriesEpisodes: {},
-    reviews: {},
-    loading: false,
-    seriesLoading: false,
     uploadLoading: false,
     uploadProgress: 0,
     uploadSuccess: false,
     uploadError: null,
+    loading: false,
     error: null,
+    seriesLoading: false,
+    filmmakerSeries: [],
+    seriesEpisodes: {},
+    reviews: {},
   },
   reducers: {
-    clearError: (state) => {
-      state.error = null;
-      state.uploadError = null;
-    },
     clearUploadSuccess: (state) => {
       state.uploadSuccess = false;
       state.uploadProgress = 0;
     },
+    clearError: (state) => {
+      state.error = null;
+    },
   },
   extraReducers: (builder) => {
-    // Upload Movie
+    // Single builder chain with all cases
     builder
+      // Upload Movie - Only one set of handlers
       .addCase(uploadMovie.pending, (state) => {
         state.uploadLoading = true;
-        state.uploadError = null;
-        state.uploadSuccess = false;
         state.uploadProgress = 0;
+        state.uploadSuccess = false;
+        state.uploadError = null;
       })
       .addCase(uploadMovie.fulfilled, (state, action) => {
         state.uploadLoading = false;
-        state.uploadSuccess = true;
         state.uploadProgress = 100;
-        state.userMovies.push(action.payload);
+        state.uploadSuccess = true;
+        if (action.payload) {
+          state.userMovies.push(action.payload);
+        }
       })
       .addCase(uploadMovie.rejected, (state, action) => {
         state.uploadLoading = false;
         state.uploadError = action.payload;
-        state.uploadSuccess = false;
         state.uploadProgress = 0;
-      });
-
-    // Create Series
-    builder
+      })
+      .addCase(setUploadProgress, (state, action) => {
+        state.uploadProgress = action.payload;
+      })
+      
+      // Create Series
       .addCase(createSeries.pending, (state) => {
         state.uploadLoading = true;
         state.uploadError = null;
@@ -224,15 +248,16 @@ const movieSlice = createSlice({
       .addCase(createSeries.fulfilled, (state, action) => {
         state.uploadLoading = false;
         state.uploadSuccess = true;
-        state.filmmakerSeries.push(action.payload);
+        if (action.payload) {
+          state.filmmakerSeries.push(action.payload);
+        }
       })
       .addCase(createSeries.rejected, (state, action) => {
         state.uploadLoading = false;
         state.uploadError = action.payload;
-      });
-
-    // Add Episode to Series
-    builder
+      })
+      
+      // Add Episode to Series
       .addCase(addEpisodeToSeries.pending, (state) => {
         state.uploadLoading = true;
         state.uploadError = null;
@@ -241,48 +266,45 @@ const movieSlice = createSlice({
       .addCase(addEpisodeToSeries.fulfilled, (state, action) => {
         state.uploadLoading = false;
         state.uploadSuccess = true;
-        // Optionally update episodes list if you're tracking it
       })
       .addCase(addEpisodeToSeries.rejected, (state, action) => {
         state.uploadLoading = false;
         state.uploadError = action.payload;
-      });
-
-    // Get User Movies
-    builder
+      })
+      
+      // Get User Movies
       .addCase(getUserMovies.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(getUserMovies.fulfilled, (state, action) => {
         state.loading = false;
-        state.userMovies = action.payload;
+        state.userMovies = action.payload || [];
       })
       .addCase(getUserMovies.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      });
-
-    // Get Filmmaker Series
-    builder
+      })
+      
+      // Get Filmmaker Series
       .addCase(getFilmmakerSeries.pending, (state) => {
         state.seriesLoading = true;
         state.error = null;
       })
       .addCase(getFilmmakerSeries.fulfilled, (state, action) => {
         state.seriesLoading = false;
-        // Handle both response formats: {data: [...]} or direct array
         state.filmmakerSeries = action.payload?.data || action.payload || [];
       })
       .addCase(getFilmmakerSeries.rejected, (state, action) => {
         state.seriesLoading = false;
         state.error = action.payload;
         state.filmmakerSeries = [];
-      });
-
-    // Get Series Episodes
-    builder
+      })
+      
+      // Get Series Episodes
       .addCase(getSeriesEpisodes.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(getSeriesEpisodes.fulfilled, (state, action) => {
         state.loading = false;
@@ -293,34 +315,32 @@ const movieSlice = createSlice({
       .addCase(getSeriesEpisodes.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      });
-
-    // Clear Upload State
-    builder
+      })
+      
+      // Clear Upload State
       .addCase(clearUploadState.fulfilled, (state) => {
         state.uploadLoading = false;
         state.uploadProgress = 0;
         state.uploadSuccess = false;
         state.uploadError = null;
-      });
-
-    // Get Reviews
-    builder
+      })
+      
+      // Get Reviews
       .addCase(getMovieReviews.fulfilled, (state, action) => {
-        state.reviews[action.meta.arg] = action.payload;
-      });
-
-    // Add Review
-    builder
+        const movieId = action.meta.arg;
+        state.reviews[movieId] = action.payload || [];
+      })
+      
+      // Add Review
       .addCase(addReview.fulfilled, (state, action) => {
         const movieId = action.meta.arg.movieId;
-        if (state.reviews[movieId]) {
-          state.reviews[movieId].push(action.payload);
+        if (!state.reviews[movieId]) {
+          state.reviews[movieId] = [];
         }
-      });
-
-    // Rate Movie
-    builder
+        state.reviews[movieId].push(action.payload);
+      })
+      
+      // Rate Movie
       .addCase(rateMovie.pending, (state) => {
         state.loading = true;
       })
@@ -330,14 +350,18 @@ const movieSlice = createSlice({
       .addCase(rateMovie.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      });
-      builder
+      })
+      
+      // Delete Movie
       .addCase(deleteMovie.pending, (state) => {
         state.loading = true;
       })
       .addCase(deleteMovie.fulfilled, (state, action) => {
         state.loading = false;
-        state.userMovies = state.userMovies.filter(movie => movie.id !== action.meta.arg);
+        const movieId = action.meta.arg;
+        state.userMovies = state.userMovies.filter(movie => 
+          movie.id !== movieId && movie._id !== movieId
+        );
       })
       .addCase(deleteMovie.rejected, (state, action) => {
         state.loading = false;
@@ -346,5 +370,5 @@ const movieSlice = createSlice({
   },
 });
 
-export const { clearError, clearUploadSuccess } = movieSlice.actions;
+export const { clearUploadSuccess, clearError } = movieSlice.actions;
 export default movieSlice.reducer;

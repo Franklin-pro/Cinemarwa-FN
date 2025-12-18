@@ -33,9 +33,10 @@ import {
   Zap,
   Star,
   ExternalLink,
+  Trash,
 } from "lucide-react";
 import { filmmmakerService } from "../../services/api/filmmaker";
-import cinemaLoaiding from "../../assets/loading.gif";
+import cinemaLoaiding from "../../assets/cinemarwandaLoading.png";
 import { useDispatch, useSelector } from "react-redux";
 import { getPaymentHistory } from "../../store/slices/paymentSlice";
 import { logoutAll } from "../../store/slices/authSlice";
@@ -47,6 +48,7 @@ function FilmmakerDashboard() {
   const [movies, setMovies] = useState([]);
   const [stats, setStats] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState(null);
+  const [analytics,setAnalytics] = useState()
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState("overview");
@@ -136,61 +138,71 @@ function FilmmakerDashboard() {
   };
 
   const formatDate = (dateString) => {
-    const options = { year: "numeric", month: "short", day: "numeric" };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+  const options = { 
+    year: "numeric", 
+    month: "short", 
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric"
   };
+  return new Date(dateString).toLocaleDateString(undefined, options);
+};
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      const [dashboardRes, moviesRes, statsRes, notificationsRes, paymentRes] =
-        await Promise.all([
-          filmmmakerService.getDashboard(),
-          filmmmakerService.getMovies(),
-          filmmmakerService.getStats(),
-          filmmmakerService.getNotifications(),
-          filmmmakerService.getPaymentMethod(),
-        ]);
+const fetchDashboardData = async () => {
+  try {
+    setLoading(true);
+    const [dashboardRes, moviesRes, statsRes, notificationsRes, analyticsRes, paymentRes] =
+      await Promise.all([
+        filmmmakerService.getDashboard(),
+        filmmmakerService.getMovies(),
+        filmmmakerService.getStats(),
+        filmmmakerService.getNotifications(),
+        filmmmakerService.getFilmmakerAnalytics(),
+        filmmmakerService.getPaymentMethod(),
+      ]);
 
-      const dashboardInfo = dashboardRes.data.data;
-      const moviesList = moviesRes.data?.data.movies || [];
-      const statsInfo = statsRes.data;
-      const paymentInfo = paymentRes.data;
+    const dashboardInfo = dashboardRes.data.data;
+    const moviesList = moviesRes.data?.data.movies || [];
+    const statsInfo = statsRes.data;
+    const paymentInfo = paymentRes.data;
+    const analyticsInfo = analyticsRes.data.data;
 
-      // Handle notifications response - check the structure
-      const notificationsResponse = notificationsRes.data.data.notifications;
-      console.log("notifications:",notificationsResponse)
-      let notificationData = [];
-
-      if (notificationsResponse) {
-        // Check different possible response structures
-        if (Array.isArray(notificationsResponse)) {
-          notificationData = notificationsResponse;
-        } else if (
-          notificationsResponse.notifications &&
-          Array.isArray(notificationsResponse.notifications)
-        ) {
-          notificationData = notificationsResponse.notifications;
-        } else if (
-          notificationsResponse.data &&
-          Array.isArray(notificationsResponse.data)
-        ) {
-          notificationData = notificationsResponse.data;
-        }
+    // FIXED: Handle notifications response correctly
+    const notificationsResponse = notificationsRes.data;
+    let notificationData = [];
+    
+    if (notificationsResponse?.success) {
+      // Your response structure: {"success":true,"data":{"total":3,"notifications":[ ... ]}}
+      if (notificationsResponse.data?.notifications) {
+        notificationData = notificationsResponse.data.notifications.map(notif => ({
+          id: notif.referenceId || Date.now() + Math.random(), // Create unique ID if none exists
+          type: notif.type || "info",
+          action: notif.action || "info",
+          title: notif.title || "Notification",
+          message: notif.message || "",
+          date: notif.date || new Date().toISOString(),
+          unread: true, // Mark all as unread initially
+          // Add icon based on type
+          icon: notif.type === "approval" ? CheckCircle : 
+                notif.type === "content" ? Film : 
+                Bell
+        }));
       }
-
-      setDashboardData(dashboardInfo);
-      setMovies(moviesList);
-      setStats(statsInfo);
-      setPaymentMethod(paymentInfo.data);
-      setNotifications(notificationData);
-    } catch (err) {
-      console.error("Error fetching dashboard:", err);
-      setError("Failed to load dashboard data");
-    } finally {
-      setLoading(false);
     }
-  };
+
+    setDashboardData(dashboardInfo);
+    setMovies(moviesList);
+    setStats(statsInfo);
+    setPaymentMethod(paymentInfo.data);
+    setAnalytics(analyticsInfo);
+    setNotifications(notificationData);
+  } catch (err) {
+    console.error("Error fetching dashboard:", err);
+    setError("Failed to load dashboard data");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const [movieToDelete, setMovieToDelete] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -205,7 +217,7 @@ function FilmmakerDashboard() {
       dispatch(deleteMovie(movieToDelete.id || movieToDelete._id))
         .unwrap()
         .then((res) => {
-          console.log("Movie deleted successfully:", res);
+
           setMovies((prevMovies) =>
             prevMovies.filter(
               (m) => m.id !== (movieToDelete.id || movieToDelete._id)
@@ -328,21 +340,29 @@ function FilmmakerDashboard() {
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "withdrawals", label: "Withdrawal History", icon: History },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "documents", label: "Documents", icon: FileText },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
-  if (loading) {
-    return (
-      <div
-        className={`min-h-screen ${
-          darkMode ? "bg-gray-900" : "bg-gray-50"
-        } flex items-center justify-center transition-colors duration-200`}
-      >
-        <img src={cinemaLoaiding} alt="Loading..." className="w-32 h-32" />
-      </div>
-    );
-  }
+if (loading) {
+  return (
+    <div
+      className={`min-h-screen ${
+        darkMode ? "bg-gray-900" : "bg-gray-50"
+      } flex flex-col items-center justify-center transition-colors duration-200`}
+    >
+      <img
+        src={cinemaLoaiding}
+        alt="Loading..."
+        className="w-32 h-32 animate-pulse"
+      />
+
+      <p className="mt-4 text-lg font-semibold text-yellow-500 animate-bounce">
+        Loading movies...
+      </p>
+    </div>
+  );
+}
+
 
   if (error) {
     return (
@@ -377,7 +397,7 @@ function FilmmakerDashboard() {
       value: formatNumber(
         dashboardData?.summary?.totalViews || stats?.totalViews || 0
       ),
-      color: "purple",
+      color: "blue",
     },
     {
       icon: DollarSign,
@@ -427,7 +447,7 @@ function FilmmakerDashboard() {
                   darkMode ? "text-white" : "text-gray-900"
                 }`}
               >
-                Dashboard
+               <a href="/"> Dashboard</a>
               </span>
             </div>
           )}
@@ -829,6 +849,7 @@ function FilmmakerDashboard() {
                                       >
                                         {notification.message}
                                       </p>
+                                      <p className="text-gray-300 text-xs pt-2">{formatDate(notification.date)}</p>
                                     </div>
                                     {notification.unread && (
                                       <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1.5"></div>
@@ -863,7 +884,7 @@ function FilmmakerDashboard() {
                                         onClick={() =>
                                           deleteNotification(notification.id)
                                         }
-                                        className={`p-1 rounded ${
+                                        className={`p-1 rounded text-red-500 ${
                                           darkMode
                                             ? "hover:bg-gray-700"
                                             : "hover:bg-gray-200"
@@ -1395,7 +1416,7 @@ function FilmmakerDashboard() {
                       </div>
                       <div className="w-px h-4 bg-gray-300 dark:bg-gray-600"></div>
                       <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                        <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                         <span
                           className={`text-sm font-medium ${
                             darkMode ? "text-gray-300" : "text-gray-600"
@@ -1418,15 +1439,6 @@ function FilmmakerDashboard() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => navigate("/dashboard/filmmaker/upload")}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all duration-200 hover:shadow-lg"
-                    >
-                      <Upload className="w-4 h-4" />
-                      Upload Movie
-                    </button>
-                  </div>
                 </div>
 
                 {movies.length === 0 ? (
@@ -1437,7 +1449,7 @@ function FilmmakerDashboard() {
                       darkMode ? "border-gray-700" : "border-gray-200"
                     } p-12 text-center transition-colors duration-200`}
                   >
-                    <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full flex items-center justify-center">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-blue-500/10 to-blue-500/10 rounded-full flex items-center justify-center">
                       <Film
                         className={`w-10 h-10 ${
                           darkMode ? "text-gray-500" : "text-gray-400"
@@ -1492,7 +1504,7 @@ function FilmmakerDashboard() {
                                 isMovie
                                   ? "bg-blue-600 text-white"
                                   : isSeries
-                                  ? "bg-purple-600 text-white"
+                                  ? "bg-blue-600 text-white"
                                   : "bg-gray-600 text-white"
                               }`}
                             >
@@ -1586,10 +1598,10 @@ function FilmmakerDashboard() {
                                     darkMode ? "text-gray-400" : "text-gray-500"
                                   }`}
                                 >
-                                  Uploaded {formatDate(content.createdAt)}
+                                  uploaded {formatDate(content.createdAt)}
                                 </p>
-                                <span className="text-white text-lg font-bold">
-                                  {content.currency}
+                                <span className="text-white text-sm font-bold">
+                                  RWF
                                   {content.viewPrice === 0 ? "FREE" : null}{" "}
                                   {formatCurrency(content.viewPrice)}
                                 </span>
@@ -1722,7 +1734,7 @@ function FilmmakerDashboard() {
                               >
                                 {isSeries
                                   ? "Manage Episodes"
-                                  : "View Analytics"}
+                                  : "Analytics"}
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1748,7 +1760,7 @@ function FilmmakerDashboard() {
                                     : "bg-red-50 hover:bg-red-100 text-red-600 hover:shadow-lg"
                                 }`}
                               >
-                                Delete
+                               <Trash/>
                               </button>
                             </div>
 
@@ -1865,151 +1877,679 @@ function FilmmakerDashboard() {
               </div>
             )}
 
-            {/* EARNINGS SECTION */}
-            {activeSection === "earnings" && (
-              <div className="space-y-6">
-                <h2
-                  className={`text-2xl font-bold ${
-                    darkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Earnings & Withdrawals
-                </h2>
+          {/* EARNINGS SECTION - Updated for Automatic Payouts */}
+{activeSection === "earnings" && (
+  <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Earnings & Payouts
+        </h2>
+        <p className={`mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+          Automatic payout system - Funds are paid directly to your MoMo
+        </p>
+      </div>
+      <div className={`px-4 py-2 rounded-full ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+        <span className={`font-semibold ${darkMode ? "text-green-400" : "text-green-700"}`}>
+          🚀 AUTOMATIC PAYOUTS
+        </span>
+      </div>
+    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div
-                    className={`${
-                      darkMode
-                        ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-200"
-                    } border rounded-xl p-6 transition-colors duration-200`}
-                  >
-                    <Wallet className="w-8 h-8 text-blue-600 mb-3" />
-                    <p
-                      className={`text-sm mb-1 ${
-                        darkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Available Balance
-                    </p>
-                    <p className="text-3xl font-bold text-blue-600">
-                      RWF{" "}
-                      {formatCurrency(
-                        dashboardData?.finance?.availableBalance || 0
-                      )}
-                    </p>
-                  </div>
-                  <div
-                    className={`${
-                      darkMode
-                        ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-200"
-                    } border rounded-xl p-6 transition-colors duration-200`}
-                  >
-                    <DollarSign className="w-8 h-8 text-green-600 mb-3" />
-                    <p
-                      className={`text-sm mb-1 ${
-                        darkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Pending Payout
-                    </p>
-                    <p className="text-3xl font-bold text-green-600">
-                      RWF{" "}
-                      {formatCurrency(
-                        dashboardData?.finance?.pendingBalance || 0
-                      )}
-                    </p>
-                  </div>
-                  <div
-                    className={`${
-                      darkMode
-                        ? "bg-gray-800 border-gray-700"
-                        : "bg-white border-gray-200"
-                    } border rounded-xl p-6 transition-colors duration-200`}
-                  >
-                    <TrendingUp className="w-8 h-8 text-blue-600 mb-3" />
-                    <p
-                      className={`text-sm mb-1 ${
-                        darkMode ? "text-gray-400" : "text-gray-600"
-                      }`}
-                    >
-                      Total Earned
-                    </p>
-                    <p className="text-3xl font-bold text-blue-600">
-                      RWF{" "}
-                      {formatCurrency(dashboardData?.finance?.totalEarned || 0)}
-                    </p>
-                  </div>
-                </div>
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Total Earned
+            </p>
+            <p className="text-3xl font-bold text-blue-600">
+              RWF {formatCurrency(analytics?.summary?.totalNetReceived || 0)}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+            <DollarSign className="w-6 h-6 text-blue-600" />
+          </div>
+        </div>
+        <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          Lifetime earnings from all content
+        </p>
+      </div>
 
-                <div
-                  className={`${
-                    darkMode
-                      ? "bg-gray-800 border-gray-700"
-                      : "bg-white border-gray-200"
-                  } border rounded-xl p-6 transition-colors duration-200`}
-                >
-                  <h3
-                    className={`text-xl font-bold mb-4 ${
-                      darkMode ? "text-white" : "text-gray-900"
-                    }`}
-                  >
-                    Request Withdrawal
-                  </h3>
-                  <div
-                    className={`${
-                      darkMode
-                        ? "bg-blue-900/20 border-blue-800"
-                        : "bg-blue-50 border-blue-200"
-                    } border rounded-lg p-4 mb-6 transition-colors duration-200`}
-                  >
-                    <p
-                      className={`text-sm ${
-                        darkMode ? "text-blue-300" : "text-blue-900"
-                      }`}
-                    >
-                      ⚠️ Minimum withdrawal: RWF 50 | Processing time: 5-7
-                      business days
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => navigate("/filmmaker/withdrawal-request")}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-lg font-semibold transition-colors"
-                  >
-                    Request Withdrawal
-                  </button>
-                </div>
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Total Received
+            </p>
+            <p className="text-3xl font-bold text-green-600">
+              RWF {formatCurrency(dashboardData?.finance?.totalEarned || 0)}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+            <Wallet className="w-6 h-6 text-green-600" />
+          </div>
+        </div>
+        <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          In your MoMo account (after 6% fees)
+        </p>
+      </div>
+
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Automatic Payouts
+            </p>
+            <p className="text-3xl font-bold text-blue-600">
+              {analytics?.summary?.totalSales || 0}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+            <CheckCircle className="w-6 h-6 text-blue-600" />
+          </div>
+        </div>
+        <p className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          Successful automatic payments
+        </p>
+      </div>
+    </div>
+
+    {/* Automatic Payout System Info */}
+    <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+      <h3 className={`text-xl font-bold mb-4 ${darkMode ? "text-white" : "text-gray-900"}`}>
+        Automatic Payout System
+      </h3>
+      
+      <div className={`${darkMode ? "bg-green-900/20 border-green-800" : "bg-green-50 border-green-200"} border rounded-lg p-4 mb-6 transition-colors duration-200`}>
+        <div className="flex items-start gap-3">
+          <div className={`p-2 rounded-lg ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+            <CheckCircle className="w-5 h-5 text-green-600" />
+          </div>
+          <div>
+            <p className={`font-semibold ${darkMode ? "text-green-400" : "text-green-900"}`}>
+              🎉 No Withdrawal Requests Needed!
+            </p>
+            <p className={`text-sm mt-1 ${darkMode ? "text-green-300" : "text-green-700"}`}>
+              Your funds are automatically sent to your MoMo when users purchase your content.
+              The system splits payments instantly: 70% to you, 30% to admin.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="space-y-4">
+          <h4 className={`font-semibold ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+            How It Works
+          </h4>
+          <ul className="space-y-3">
+            <li className="flex items-start gap-2">
+              <div className={`p-1 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+                <span className="text-blue-600 text-xs font-bold">1</span>
               </div>
-            )}
-
-            {/* ANALYTICS SECTION */}
-            {activeSection === "analytics" && (
-              <div
-                className={`${
-                  darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                } border rounded-xl p-12 text-center transition-colors duration-200`}
-              >
-                <BarChart3
-                  className={`w-16 h-16 mx-auto mb-4 ${
-                    darkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-                <h3
-                  className={`text-xl font-bold mb-2 ${
-                    darkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Analytics Dashboard
-                </h3>
-                <p className={darkMode ? "text-gray-400" : "text-gray-600"}>
-                  Detailed analytics and insights coming soon
-                </p>
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
+                User purchases your content
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className={`p-1 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+                <span className="text-blue-600 text-xs font-bold">2</span>
               </div>
-            )}
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
+                Payment is split: 70% to you, 30% to admin
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className={`p-1 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+                <span className="text-blue-600 text-xs font-bold">3</span>
+              </div>
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
+                Funds sent directly to your MoMo (minus 6% gateway fee)
+              </span>
+            </li>
+            <li className="flex items-start gap-2">
+              <div className={`p-1 rounded-full ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+                <span className="text-blue-600 text-xs font-bold">4</span>
+              </div>
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
+                Check "Payout History" for all automatic payments
+              </span>
+            </li>
+          </ul>
+        </div>
 
+        <div className="space-y-4">
+          <h4 className={`font-semibold ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+            Payment Split Example
+          </h4>
+          <div className={`p-4 rounded-lg ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between mb-3">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>User pays:</span>
+              <span className="font-bold text-blue-600">RWF 100</span>
+            </div>
+            <div className="flex justify-between mb-2">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>→ Filmmaker (70%):</span>
+              <span className="font-bold text-green-600">RWF 70</span>
+            </div>
+            <div className="flex justify-between mb-2">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>→ Gateway fee (6%):</span>
+              <span className="font-bold text-orange-600">-RWF 4.20</span>
+            </div>
+            <div className="flex justify-between mb-2">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>→ You receive:</span>
+              <span className="font-bold text-green-600">RWF 65.80</span>
+            </div>
+            <div className="flex justify-between mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>→ Admin (30%):</span>
+              <span className="font-bold text-blue-600">RWF 30</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div>
+          <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+            Last automatic payout
+          </p>
+          <p className="text-sm font-medium">
+            {dashboardData?.finance?.lastWithdrawalDate 
+              ? formatDate(dashboardData.finance.lastWithdrawalDate)
+              : "No payments yet"}
+          </p>
+        </div>
+        <button
+          onClick={() => navigate("/filmmaker/payout-history")}
+          className={`px-4 py-2 rounded-lg font-medium ${
+            darkMode
+              ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+          }`}
+        >
+          View Payout History
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{activeSection === "analytics" && (
+  <div className="space-y-6">
+    {/* Analytics Header */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+      <div>
+        <h2 className={`text-2xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Analytics Dashboard
+        </h2>
+        <p className={`mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+          {analytics?.period?.label || "Last 30 days"}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className={`text-sm px-3 py-1 rounded-full ${darkMode ? "bg-gray-700" : "bg-gray-100"}`}>
+          <span className={darkMode ? "text-gray-300" : "text-gray-600"}>
+            {analytics?.period?.days || 30} days
+          </span>
+        </div>
+        <button
+          onClick={fetchDashboardData}
+          className={`px-4 py-2 rounded-lg font-medium text-sm ${
+            darkMode
+              ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+          }`}
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    {/* Summary Cards */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Total Content */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Total Content
+            </p>
+            <p className={`text-3xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>
+              {analytics?.summary?.totalContent || 0}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+            <Film className="w-6 h-6 text-blue-600" />
+          </div>
+        </div>
+        <div className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          {analytics?.contentBreakdown?.byType?.movie?.count || 0} Movies • 
+          {analytics?.contentBreakdown?.byType?.series?.count || 0} Series
+        </div>
+      </div>
+
+      {/* Total Views */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Total Views
+            </p>
+            <p className={`text-3xl font-bold ${darkMode ? "text-white" : "text-gray-900"}`}>
+              {formatNumber(analytics?.summary?.totalViews || 0)}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-blue-900/30" : "bg-blue-100"}`}>
+            <Eye className="w-6 h-6 text-blue-600" />
+          </div>
+        </div>
+        <div className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          {analytics?.averages?.viewsPerContent?.toFixed(0) || 0} avg per content
+        </div>
+      </div>
+
+      {/* Total Sales */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Total Sales
+            </p>
+            <p className={`text-3xl font-bold text-green-600`}>
+              {formatNumber(analytics?.summary?.totalSales || 0)}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+            <DollarSign className="w-6 h-6 text-green-600" />
+          </div>
+        </div>
+        <div className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          {analytics?.summary?.conversionRate?.toFixed(2) || 0}% conversion rate
+        </div>
+      </div>
+
+      {/* Filmmaker Earnings */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className={`text-sm mb-1 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+              Your Earnings
+            </p>
+            <p className={`text-3xl font-bold text-green-600`}>
+              RWF {formatCurrency(analytics?.summary?.filmmakerEarnings || 0)}
+            </p>
+          </div>
+          <div className={`p-3 rounded-lg ${darkMode ? "bg-green-900/30" : "bg-green-100"}`}>
+            <Wallet className="w-6 h-6 text-green-600" />
+          </div>
+        </div>
+        <div className={`text-xs mt-3 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+          After all fees
+        </div>
+      </div>
+    </div>
+
+    {/* Revenue Breakdown */}
+    <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+      <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+        Revenue Breakdown
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="text-center">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Gross Revenue</p>
+            <p className="text-2xl font-bold text-blue-600 mt-2">
+              RWF {formatCurrency(analytics?.summary?.grossRevenue || 0)}
+            </p>
+          </div>
+        </div>
+        <div className="text-center">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Gateway Fees (6%)</p>
+            <p className="text-2xl font-bold text-orange-600 mt-2">
+              RWF {formatCurrency(analytics?.summary?.gatewayFees || 0)}
+            </p>
+          </div>
+        </div>
+        <div className="text-center">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>After Gateway Fee</p>
+            <p className="text-2xl font-bold text-green-600 mt-2">
+              RWF {formatCurrency(analytics?.summary?.netRevenue || 0)}
+            </p>
+          </div>
+        </div>
+        <div className="text-center">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm ${darkMode ? "text-gray-400" : "text-gray-500"}`}>Platform Fee (30%)</p>
+            <p className="text-2xl font-bold text-red-600 mt-2">
+              RWF {formatCurrency(analytics?.summary?.platformFee || 0)}
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 p-4 rounded-lg bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20">
+        <div className="flex justify-between items-center">
+          <div>
+            <p className={`font-semibold ${darkMode ? "text-green-400" : "text-green-700"}`}>
+              Your Share: 70%
+            </p>
+            <p className={`text-sm mt-1 ${darkMode ? "text-gray-300" : "text-gray-600"}`}>
+              Filmmaker Earnings (After all fees)
+            </p>
+          </div>
+          <p className="text-2xl font-bold text-green-600">
+            RWF {formatCurrency(analytics?.summary?.filmmakerEarnings || 0)}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Growth & Averages Grid */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Growth Metrics */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Growth Metrics
+        </h3>
+        <div className="space-y-4">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between items-center">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>Revenue Growth</span>
+              <div className="flex items-center gap-2">
+                <TrendingUp className={`w-5 h-5 ${
+                  analytics?.growth?.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"
+                }`} />
+                <span className={`text-xl font-bold ${
+                  analytics?.growth?.revenueGrowth >= 0 ? "text-green-600" : "text-red-600"
+                }`}>
+                  {analytics?.growth?.revenueGrowth >= 0 ? "+" : ""}{analytics?.growth?.revenueGrowth?.toFixed(1) || 0}%
+                </span>
+              </div>
+            </div>
+            <p className={`text-xs mt-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              vs previous period (RWF {formatCurrency(analytics?.growth?.previousPeriodRevenue || 0)})
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between items-center">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>Sales Growth</span>
+              <div className="flex items-center gap-2">
+                <TrendingUp className={`w-5 h-5 ${
+                  analytics?.growth?.salesGrowth >= 0 ? "text-green-600" : "text-red-600"
+                }`} />
+                <span className={`text-xl font-bold ${
+                  analytics?.growth?.salesGrowth >= 0 ? "text-green-600" : "text-red-600"
+                }`}>
+                  {analytics?.growth?.salesGrowth >= 0 ? "+" : ""}{analytics?.growth?.salesGrowth?.toFixed(1) || 0}%
+                </span>
+              </div>
+            </div>
+            <p className={`text-xs mt-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              vs previous period ({analytics?.growth?.previousPeriodSales || 0} sales)
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Averages */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Average Metrics
+        </h3>
+        <div className="space-y-4">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between items-center">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>Revenue per Sale</span>
+              <span className="text-xl font-bold text-blue-600">
+                RWF {formatCurrency(analytics?.averages?.revenuePerSale || 0)}
+              </span>
+            </div>
+          </div>
+
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between items-center">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>Views per Content</span>
+              <span className="text-xl font-bold text-blue-600">
+                {analytics?.averages?.viewsPerContent?.toFixed(0) || 0}
+              </span>
+            </div>
+          </div>
+
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between items-center">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>Revenue per Day</span>
+              <span className="text-xl font-bold text-blue-600">
+                RWF {formatCurrency(analytics?.averages?.revenuePerDay || 0)}
+              </span>
+            </div>
+          </div>
+
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <div className="flex justify-between items-center">
+              <span className={darkMode ? "text-gray-300" : "text-gray-600"}>Sales per Day</span>
+              <span className="text-xl font-bold text-blue-600">
+                {analytics?.averages?.salesPerDay?.toFixed(2) || 0}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Top Performing Content */}
+    {analytics?.topPerforming && (
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Top Performing Content
+        </h3>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* By Revenue */}
+          <div>
+            <h4 className={`text-sm font-semibold mb-4 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Top by Revenue
+            </h4>
+            <div className="space-y-3">
+              {analytics.topPerforming.byRevenue?.slice(0, 5).map((content, index) => (
+                <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+                      <span className="font-bold text-sm">{index + 1}</span>
+                    </div>
+                    <div>
+                      <p className={`font-semibold text-sm ${darkMode ? "text-white" : "text-gray-900"}`}>
+                        {content.title}
+                      </p>
+                      <span className={`text-xs ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                        {formatNumber(content.views)} views
+                      </span>
+                    </div>
+                  </div>
+                  <p className="font-bold text-green-600 text-sm">
+                    RWF {formatCurrency(content.revenue)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* By Views */}
+          <div>
+            <h4 className={`text-sm font-semibold mb-4 ${darkMode ? "text-gray-300" : "text-gray-700"}`}>
+              Top by Views
+            </h4>
+            <div className="space-y-3">
+              {analytics.topPerforming.byViews?.slice(0, 5).map((content, index) => (
+                <div key={index} className={`flex items-center justify-between p-3 rounded-lg ${darkMode ? 'bg-gray-700/50' : 'bg-gray-50'} hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${darkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
+                      <span className="font-bold text-sm">{index + 1}</span>
+                    </div>
+                    <div>
+                      <p className={`font-semibold text-sm ${darkMode ? "text-white" : "text-gray-900"}`}>
+                        {content.title}
+                      </p>
+                      <span className={`text-xs text-green-600`}>
+                        RWF {formatCurrency(content.revenue)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className={`font-bold text-blue-600 text-sm`}>
+                    {formatNumber(content.views)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Payment Methods & Audience */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Payment Methods */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Payment Methods
+        </h3>
+        <div className="space-y-4">
+          {analytics?.paymentMethods?.map((method, index) => (
+            <div key={index}>
+              <div className="flex justify-between text-sm mb-2">
+                <span className={darkMode ? "text-gray-300" : "text-gray-700"}>
+                  {method.method === "MoMo" ? "Mobile Money (MoMo)" : method.method}
+                </span>
+                <span className={darkMode ? "text-gray-400" : "text-gray-600"}>
+                  {method.percentage}% ({method.count} sales)
+                </span>
+              </div>
+              <div className={`w-full h-3 rounded-full ${darkMode ? "bg-gray-700" : "bg-gray-200"}`}>
+                <div 
+                  className={`h-full rounded-full ${
+                    method.method.toLowerCase().includes("momo") ? "bg-green-600" : 
+                    method.method.toLowerCase().includes("card") ? "bg-blue-600" : 
+                    "bg-blue-600"
+                  }`}
+                  style={{ width: `${method.percentage}%` }}
+                ></div>
+              </div>
+              <p className={`text-xs mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                Total: RWF {formatCurrency(method.amount)}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Audience Insights */}
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-6 transition-colors duration-200`}>
+        <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+          Audience Insights
+        </h3>
+        <div className="space-y-6">
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              Unique Viewers
+            </p>
+            <p className="text-3xl font-bold text-blue-600">
+              {formatNumber(analytics?.summary?.uniqueViewers || 0)}
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              Conversion Rate
+            </p>
+            <p className="text-3xl font-bold text-green-600">
+              {analytics?.summary?.conversionRate?.toFixed(2) || 0}%
+            </p>
+            <p className={`text-xs mt-2 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+              {analytics?.summary?.totalSales || 0} sales from {analytics?.summary?.totalViews || 0} views
+            </p>
+          </div>
+
+          <div className={`p-4 rounded-xl ${darkMode ? "bg-gray-700/50" : "bg-gray-50"}`}>
+            <p className={`text-sm mb-2 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+              Average Rating
+            </p>
+            <div className="flex items-center gap-2">
+              <Star className="w-6 h-6 text-yellow-500 fill-current" />
+              <p className="text-3xl font-bold">
+                {analytics?.summary?.avgRating?.toFixed(1) || "0.0"}
+              </p>
+              <span className={`text-lg ${darkMode ? "text-gray-400" : "text-gray-500"}`}>/ 5.0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Financial Summary Card */}
+    <div className={`${darkMode ? "bg-gradient-to-br from-green-900/20 to-blue-900/20 border-green-800/30" : "bg-gradient-to-br from-green-50 to-blue-50 border-green-200"} border rounded-xl p-6 transition-colors duration-200`}>
+      <h3 className={`text-lg font-bold mb-6 ${darkMode ? "text-white" : "text-gray-900"}`}>
+        Financial Summary
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="text-center">
+          <p className={`text-sm mb-2 ${darkMode ? "text-green-300" : "text-green-700"}`}>
+            Gross Pending Balance
+          </p>
+          <p className="text-2xl font-bold text-green-600">
+            RWF {formatCurrency(analytics?.financialSummary?.grossPendingBalance || 0)}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className={`text-sm mb-2 ${darkMode ? "text-green-300" : "text-green-700"}`}>
+            Available Balance
+          </p>
+          <p className="text-2xl font-bold text-green-600">
+            RWF {formatCurrency(analytics?.financialSummary?.availableBalance || 0)}
+          </p>
+          <p className={`text-xs mt-1 ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+            After 6% gateway fee
+          </p>
+        </div>
+        <div className="text-center">
+          <p className={`text-sm mb-2 ${darkMode ? "text-blue-300" : "text-blue-700"}`}>
+            Withdrawn Balance
+          </p>
+          <p className="text-2xl font-bold text-blue-600">
+            RWF {formatCurrency(analytics?.financialSummary?.withdrawnBalance || 0)}
+          </p>
+        </div>
+        <div className="text-center">
+          <p className={`text-sm mb-2 ${darkMode ? "text-blue-300" : "text-blue-700"}`}>
+            Total Earned
+          </p>
+          <p className="text-2xl font-bold text-blue-600">
+            RWF {formatCurrency(analytics?.financialSummary?.totalEarned || 0)}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    {/* Empty State */}
+    {(!analytics || Object.keys(analytics).length === 0) && !loading && (
+      <div className={`${darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"} border rounded-xl p-12 text-center transition-colors duration-200`}>
+        <BarChart3 className={`w-16 h-16 mx-auto mb-4 ${darkMode ? "text-gray-600" : "text-gray-400"}`} />
+        <h3 className={`text-xl font-bold mb-2 ${darkMode ? "text-white" : "text-gray-900"}`}>
+          No Analytics Data Yet
+        </h3>
+        <p className={`mb-6 ${darkMode ? "text-gray-400" : "text-gray-600"}`}>
+          Start uploading content to see detailed analytics and insights
+        </p>
+        <button
+          onClick={() => navigate("/dashboard/filmmaker/upload")}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+        >
+          Upload Your First Movie
+        </button>
+      </div>
+    )}
+  </div>
+)}
 {/* NOTIFICATIONS SECTION */}
 {activeSection === "notifications" && (
   <div
@@ -2186,7 +2726,7 @@ function FilmmakerDashboard() {
                         }`}
                         title="Delete notification"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4 text-red-500" />
                       </button>
                     </div>
                   </div>
@@ -2199,11 +2739,11 @@ function FilmmakerDashboard() {
                   </p>
                   <div className="flex items-center justify-between">
                     <span
-                      className={`text-xs ${
-                        darkMode ? "text-gray-500" : "text-gray-400"
+                      className={`text-xs font-medium ${
+                        darkMode ? "text-gray-300" : "text-gray-400"
                       }`}
                     >
-                      {notification.time || formatDate(notification.createdAt) || "Recently"}
+                      {notification.time || formatDate(notification.date) || "Recently"}
                     </span>
                     <div className="flex items-center gap-3">
                       {notification.unread && (
@@ -2242,32 +2782,6 @@ function FilmmakerDashboard() {
   </div>
 )}
 
-            {/* DOCUMENTS SECTION */}
-            {activeSection === "documents" && (
-              <div
-                className={`${
-                  darkMode
-                    ? "bg-gray-800 border-gray-700"
-                    : "bg-white border-gray-200"
-                } border rounded-xl p-12 text-center transition-colors duration-200`}
-              >
-                <FileText
-                  className={`w-16 h-16 mx-auto mb-4 ${
-                    darkMode ? "text-gray-600" : "text-gray-400"
-                  }`}
-                />
-                <h3
-                  className={`text-xl font-bold mb-2 ${
-                    darkMode ? "text-white" : "text-gray-900"
-                  }`}
-                >
-                  Documents
-                </h3>
-                <p className={darkMode ? "text-gray-400" : "text-gray-600"}>
-                  Your contracts, invoices, and statements
-                </p>
-              </div>
-            )}
 
             {/* SETTINGS SECTION */}
             {activeSection === "settings" && (

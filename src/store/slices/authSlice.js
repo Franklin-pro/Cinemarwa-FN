@@ -161,6 +161,56 @@ export const deleteAccount = createAsyncThunk('/auth/deleteAccount', async () =>
   return null;
 });
 
+export const upgradeUser = createAsyncThunk('/auth/upgradeuser', async () => {
+  try {
+    await authService.upgradeuser();
+  } catch (error) {
+    // ignore network errors for upgradeuser, still clear local storage
+    console.error("Error upgrading user:", error);
+  }
+  return null;
+});
+
+export const changePassword = createAsyncThunk('/auth/changePassword', async (data) => {
+  try {
+    await authService.changePassword(data);
+  } catch (error) {
+    // ignore network errors for changePassword, still clear local storage
+    console.error("Error changing password:", error);
+  }
+  return null;
+});
+export const removeDevice = createAsyncThunk('/auth/removeDevice', async (deviceId) => {
+  try {
+    await authService.removeDevice(deviceId);
+  } catch (error) {
+    // ignore network errors for removeDevice, still clear local storage
+    console.error("Error removing device:", error);
+  }
+  return null;
+})
+export const getActiveDevices = createAsyncThunk('/auth/getActiveDevices', async () => {
+  try {
+    const response = await authService.getActiveDevices();
+    return response.data;
+  } catch (error) {
+    // ignore network errors for getActiveDevices, still clear local storage
+    console.error("Error getting active devices:", error);
+  }
+  return null;
+});
+
+export const getCurrentUser = createAsyncThunk('/auth/getCurrentUser', async () => {
+  try {
+    const response = await authService.getCurrentUser();
+    return response.data;
+  } catch (error) {
+    // ignore network errors for getCurrentUser, still clear local storage
+    console.error("Error getting current user:", error);
+  }
+  return null;
+});
+
 
 // Slice
 const authSlice = createSlice({

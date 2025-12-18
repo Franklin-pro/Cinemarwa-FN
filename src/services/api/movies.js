@@ -20,19 +20,23 @@ export const moviesService = {
   getAllMovies: (params) => moviesAxios.get('/', { params }),
   getMovie: (id) => moviesAxios.get(`/${id}`),
   getMovieById: (id) => moviesAxios.get(`/${id}`),
+  
   uploadMovie: (formData, onUploadProgress) =>
     moviesAxios.post('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: onUploadProgress,
     }),
-  createSeries : (filmmakerId,formData) =>
+  
+  createSeries: (filmmakerId, formData) =>
     moviesAxios.post(`/${filmmakerId}/series`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
-addEpisodeToSeries : (filmmakerId,seriesId, formData) =>
+  
+  addEpisodeToSeries: (filmmakerId, seriesId, formData) =>
     moviesAxios.post(`/${filmmakerId}/series/${seriesId}/add-episode`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  
   updateMovie: (id, data) => moviesAxios.put(`/${id}`, data),
   deleteMovie: (id) => moviesAxios.delete(`/${id}`),
 
@@ -48,13 +52,18 @@ addEpisodeToSeries : (filmmakerId,seriesId, formData) =>
     moviesAxios.put(`/${movieId}/reviews/${reviewId}`, reviewData),
   deleteReview: (movieId, reviewId) =>
     moviesAxios.delete(`/${movieId}/reviews/${reviewId}`),
-    // Get filmmaker's series
+
+  // Get filmmaker's series
   getFilmmakerSeries: (filmmakerId) =>
-    moviesAxios.get(`/movies/filmmaker/${filmmakerId}/series`).then(res => res.data),
+    moviesAxios.get(`/filmmaker/${filmmakerId}/series`),
+
+  // Get series episodes
+  getSeriesEpisodes: (filmmakerId, seriesId) =>
+    moviesAxios.get(`/${filmmakerId}/series/${seriesId}/episodes`),
 
   // Ratings
   rateMovie: (movieId, rating) =>
-    moviesAxios.post(`/${movieId}/rating`, { rating }),
+    moviesAxios.post(`/${movieId}/rate`, { rating }),
   getMovieRating: (movieId) => moviesAxios.get(`/${movieId}/rating`),
 
   // Search & Filter

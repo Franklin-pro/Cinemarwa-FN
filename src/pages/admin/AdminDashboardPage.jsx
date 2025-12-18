@@ -356,7 +356,7 @@ function ActivitiesTab({
       case 'signup':
         return 'bg-green-500/20 text-green-400';
       case 'movie_upload':
-        return 'bg-purple-500/20 text-purple-400';
+        return 'bg-blue-500/20 text-blue-400';
       case 'payment':
         return 'bg-emerald-500/20 text-emerald-400';
       case 'approval':
@@ -605,7 +605,7 @@ function PerformanceTab({
 
         {/* Top Performer Highlight */}
         {filmmakersPerformance?.summary?.topPerformer && (
-          <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-lg p-6 mb-8">
+          <div className="bg-gradient-to-r from-blue-500/10 to-blue-500/10 border border-blue-500/30 rounded-lg p-6 mb-8">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">🏆</span>
               <h3 className="text-xl font-semibold">Top Performer</h3>

@@ -94,7 +94,6 @@ export const verifyFilmmakerBankAction = createAsyncThunk(
   'admin/verifyFilmmakerBank',
   async ({ filmmakerId, data }, { rejectWithValue }) => {
     try {
-      console.log('Thunk: Verifying filmmaker bank', { filmmakerId, data });
       const response = await adminAPI.verifyFilmmakerBank(filmmakerId, data);
       return { response, filmmakerId, data };
     } catch (error) {

@@ -26,6 +26,7 @@ export const filmmmakerService = {
   getStats: () => filmmmakerAPI.get('/stats'),
   getSeriesEpisodes: (seriesId) => filmmmakerAPI.get(`/series/${seriesId}/episodes`),
   getNotifications : ()=> filmmmakerAPI.get('/notifications'),
+  getFilmmakerAnalytics: () => filmmmakerAPI.get('/analytics'),
 
 
   // ====== PAYMENT METHOD ======

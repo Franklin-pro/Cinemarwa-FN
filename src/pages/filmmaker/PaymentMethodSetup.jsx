@@ -36,7 +36,7 @@ function PaymentMethodSetup() {
       setLoading(true);
       const response = await filmmmakerService.getPaymentMethod();
       if (response.data) {
-        setPaymentMethod(response.data);
+        setPaymentMethod(response.data.data);
 
         // Map backend response to form data
         const newFormData = { ...formData };

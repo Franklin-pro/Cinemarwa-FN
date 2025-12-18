@@ -15,7 +15,6 @@ function UserHomepage() {
   const [error, setError] = useState(null);
 
 
-  // console.log('Selected Movie ID:', allMovies);
 
   useEffect(() => {
     const fetchMovies = async () => {
@@ -23,7 +22,6 @@ function UserHomepage() {
         setLoading(true);
         // Fetch all uploaded movies from backend
         const response = await moviesService.getAllMovies({ limit: 50 });
-        console.log('API Response:', response.data.data.movies);
 
         // Handle API response structure: response.data.data contains the movies array
         const rawMovies = response.data?.data.movies || response.data || [];

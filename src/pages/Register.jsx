@@ -33,9 +33,6 @@ function Register() {
         
         setDeviceFingerprint(fingerprint);
         setDeviceInfo(deviceData);
-        
-        console.log('Device Fingerprint:', fingerprint.substring(0, 20) + '...');
-        console.log('Device Info:', deviceData);
       } catch (error) {
         console.error('Failed to generate fingerprint:', error);
       }

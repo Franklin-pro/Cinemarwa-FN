@@ -80,9 +80,9 @@ function MovieSlider({ title, subtitle = "", movies }) {
     if (posterUrl) {
       if (posterUrl.includes('/series/')) {
         return { 
-          icon: <Tv className="w-3 h-3 text-purple-500" />, 
+          icon: <Tv className="w-3 h-3 text-blue-500" />, 
           label: "Series", 
-          color: "bg-purple-600" 
+          color: "bg-blue-600" 
         };
       }
       if (posterUrl.includes('/movies/')) {
@@ -107,9 +107,9 @@ function MovieSlider({ title, subtitle = "", movies }) {
     // This is a heuristic - adjust based on your business logic
     if (movie.viewPrice > 50) { // If view price is high, might be series
       return { 
-        icon: <Tv className="w-3 h-3 text-purple-500" />, 
+        icon: <Tv className="w-3 h-3 text-blue-500" />, 
         label: "Series", 
-        color: "bg-purple-600" 
+        color: "bg-blue-600" 
       };
     }
     

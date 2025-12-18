@@ -51,17 +51,13 @@ const isBackendMovie = isUuid || isMongoId;
 
         if (isBackendMovie) {
           try {
-            console.log(`🎬 Fetching backend movie with ID: ${movieId} (${isUuid ? 'UUID' : 'MongoDB'})`);
             const response = await moviesService.getMovie(movieId);
             movieData = response.data.data;
-            console.log(`✅ Backend movie found:`, movieData?.title || 'Unknown');
             
             // Check if it's a series and fetch episodes
             if (movieData?.contentType === "series") {
-              console.log(`📺 Series detected, fetching episodes...`);
               episodesData = movieData.episodes || generateMockEpisodes(movieData);
               seasonsData = movieData.seasons || getSeasonsFromEpisodes(episodesData);
-              console.log(`✅ Found ${episodesData.length} episodes in ${seasonsData.length} seasons`);
             }
           } catch (err) {
             console.error("❌ Backend API error for movie ID:", movieId, err.message);
@@ -69,9 +65,7 @@ const isBackendMovie = isUuid || isMongoId;
             return;
           }
         } else if (isTmdbId) {
-          console.log(`🎬 Fetching TMDB movie with ID: ${movieId}`);
           movieData = await getMovieDetails(movieId);
-          console.log(`✅ TMDB movie found:`, movieData?.title || 'Unknown');
         } else {
           console.error("❌ Invalid movieId format:", movieId);
           setError(true);
@@ -134,7 +128,6 @@ const isBackendMovie = isUuid || isMongoId;
 
   // Check if user has access to the content
   const hasAccess = movie?.userAccess?.hasAccess === true;
-  console.log("accessssss",movie?.userAccess);
   const requiresPurchase = movie?.userAccess?.requiresPurchase === true;
 
 const handleWatchNow = async () => {

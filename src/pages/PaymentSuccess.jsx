@@ -93,9 +93,6 @@ function PaymentSuccess() {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.click();
-      
-      // Track download attempt
-      console.log('Download initiated:', url);
     }
   };
 
@@ -123,7 +120,7 @@ function PaymentSuccess() {
       return (
         <button
           onClick={() => navigate('/dashboard')}
-          className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 group"
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-500 hover:from-blue-600 hover:to-blue-600 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 group"
         >
           <Zap className="w-6 h-6 group-hover:animate-pulse" />
           Go to Your Dashboard
@@ -300,13 +297,13 @@ function PaymentSuccess() {
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-32 h-32 mx-auto mb-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-ping opacity-20"></div>
-            <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full animate-ping opacity-20"></div>
+            <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full animate-pulse"></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <RefreshCw className="w-16 h-16 animate-spin text-white" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-blue-400 bg-clip-text text-transparent">
             Loading Payment Details
           </h2>
           <p className="text-gray-400">Please wait while we fetch your transaction...</p>
@@ -357,7 +354,7 @@ function PaymentSuccess() {
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {/* Gradient Orbs */}
-        <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
         
         {/* Animated Particles */}
@@ -384,8 +381,8 @@ function PaymentSuccess() {
           {/* Success Header */}
           <div className="text-center mb-8 md:mb-12">
             <div className="relative w-24 h-24 md:w-32 md:h-32 mx-auto mb-4 md:mb-6">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-ping opacity-20"></div>
-              <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full shadow-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full animate-ping opacity-20"></div>
+              <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full shadow-2xl"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <CheckCircle className="w-12 h-12 md:w-16 md:h-16 text-white" />
               </div>
@@ -396,7 +393,7 @@ function PaymentSuccess() {
               Payment Verified & Secured
             </div>
             
-            <h1 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
+            <h1 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 bg-gradient-to-r from-blue-400 via-blue-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
               Payment Successful! 🎉
             </h1>
             <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto px-4">
@@ -485,7 +482,7 @@ function PaymentSuccess() {
               {isSubscription ? (
                 <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-4 md:p-6">
                   <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 flex items-center">
-                    <Zap className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-purple-400" />
+                    <Zap className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-blue-400" />
                     Subscription Details
                   </h2>
                   
@@ -731,7 +728,7 @@ function PaymentSuccess() {
               </div>
               
               {/* Quick Stats */}
-              <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 backdrop-blur-sm rounded-2xl border border-blue-700/30 p-4 md:p-6">
+              <div className="bg-gradient-to-br from-blue-900/20 to-blue-900/20 backdrop-blur-sm rounded-2xl border border-blue-700/30 p-4 md:p-6">
                 <h3 className="text-lg md:text-xl font-bold mb-3 md:mb-4 flex items-center">
                   <CheckCircle className="w-4 h-4 md:w-5 md:h-5 mr-2 text-blue-400" />
                   Your Purchase
