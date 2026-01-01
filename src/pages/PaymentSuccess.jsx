@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import {
@@ -35,19 +35,29 @@ function PaymentSuccess() {
   const [movie, setMovie] = useState(null);
   const [isSubscription, setIsSubscription] = useState(false);
   const [isCheckingAccess, setIsCheckingAccess] = useState(false);
+  const [pollCount, setPollCount] = useState(0);
+  const [hasUrls, setHasUrls] = useState(false);
+  
+  const hasFetchedRef = useRef(false);
+  const fetchTimeoutRef = useRef(null);
+  const MAX_POLLS = 3; // Limit to 3 retries for URLs
 
+  // Initial fetch
   useEffect(() => {
-    if (transactionId) {
+    if (transactionId && !hasFetchedRef.current) {
+      hasFetchedRef.current = true;
       dispatch(getPaymentDetails(transactionId));
     }
   }, [transactionId, dispatch]);
 
+  // Handle payment details updates and smart polling
   useEffect(() => {
-    if (currentPaymentDetails) {
+    if (currentPaymentDetails && !loading) {
       const paymentData = currentPaymentDetails.payment || currentPaymentDetails;
+      
+      // Update state
       setPayment(paymentData);
       
-      // Check if this is a subscription payment
       const isSub = paymentData.type?.includes('subscription');
       setIsSubscription(isSub);
       
@@ -55,16 +65,50 @@ function PaymentSuccess() {
         setMovie(paymentData.movie);
       }
       
-      // Check if secure URLs are available but not present in state
-      if (!isSub && paymentData.paymentStatus === 'succeeded' && 
-          !paymentData.secureDownloadUrl && !paymentData.secureStreamingUrl) {
-        // Fetch updated payment details to get URLs
-        setTimeout(() => {
+      // Check if URLs are available
+      const urlsAvailable = paymentData.secureDownloadUrl || 
+                           paymentData.secureStreamingUrl || 
+                           paymentData.secureHlsUrl;
+      setHasUrls(urlsAvailable);
+      
+      // Clear any existing timeout
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = null;
+      }
+      
+      // Smart polling logic for missing URLs
+      if (!isSub && 
+          paymentData.paymentStatus === 'succeeded' && 
+          !urlsAvailable && 
+          pollCount < MAX_POLLS) {
+        
+        // Exponential backoff: 2s, 4s, 8s
+        const pollDelay = 2000 * Math.pow(2, pollCount);
+        
+        fetchTimeoutRef.current = setTimeout(() => {
+          console.log(`Polling for URLs (attempt ${pollCount + 1}/${MAX_POLLS})`);
           dispatch(getPaymentDetails(transactionId));
-        }, 2000);
+          setPollCount(prev => prev + 1);
+        }, pollDelay);
       }
     }
-  }, [currentPaymentDetails, dispatch, transactionId]);
+    
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, [currentPaymentDetails, loading, dispatch, transactionId, pollCount]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const formatCurrency = (amount, currency = 'RWF') => {
     try {
@@ -82,7 +126,11 @@ function PaymentSuccess() {
   const handleRefreshAccess = () => {
     setIsCheckingAccess(true);
     dispatch(getPaymentDetails(transactionId))
-      .finally(() => setIsCheckingAccess(false));
+      .finally(() => {
+        setIsCheckingAccess(false);
+        // Reset poll count to allow more attempts
+        setPollCount(0);
+      });
   };
 
   const handleDownload = (url) => {
@@ -93,9 +141,6 @@ function PaymentSuccess() {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.click();
-      
-      // Track download attempt
-      console.log('Download initiated:', url);
     }
   };
 
@@ -123,7 +168,7 @@ function PaymentSuccess() {
       return (
         <button
           onClick={() => navigate('/dashboard')}
-          className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 group"
+          className="w-full bg-gradient-to-r from-blue-500 to-blue-500 hover:from-blue-600 hover:to-blue-600 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-3 group"
         >
           <Zap className="w-6 h-6 group-hover:animate-pulse" />
           Go to Your Dashboard
@@ -231,7 +276,7 @@ function PaymentSuccess() {
     }
 
     // If payment succeeded but no URLs yet
-    if (payment?.paymentStatus === 'succeeded') {
+    if (payment?.paymentStatus === 'succeeded' && !hasUrls) {
       return (
         <div className="space-y-4">
           <div className="p-4 bg-yellow-900/20 border-2 border-yellow-700/50 rounded-2xl">
@@ -240,37 +285,65 @@ function PaymentSuccess() {
                 <RefreshCw className="w-6 h-6 text-yellow-400" />
               </div>
               <div>
-                <h3 className="font-bold text-yellow-300">Processing Access</h3>
-                <p className="text-sm text-yellow-400/80">Almost there!</p>
+                <h3 className="font-bold text-yellow-300">
+                  {pollCount === 0 ? 'Processing Access' : 'Setting Up Access'}
+                </h3>
+                <p className="text-sm text-yellow-400/80">
+                  {pollCount < MAX_POLLS 
+                    ? `Attempt ${pollCount + 1} of ${MAX_POLLS}` 
+                    : 'Taking longer than expected'
+                  }
+                </p>
               </div>
             </div>
             
             <p className="text-sm text-gray-300 mb-4">
-              Your payment is confirmed! We're setting up your access. This usually takes a few moments.
+              {pollCount < MAX_POLLS
+                ? "Your payment is confirmed! We're setting up your access. This usually takes a few moments."
+                : "Your access is taking longer than usual to set up. Please try refreshing or contact support if the issue persists."
+              }
             </p>
             
-            <button
-              onClick={handleRefreshAccess}
-              disabled={isCheckingAccess}
-              className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-800 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-bold transition-all duration-300 flex items-center justify-center gap-3"
-            >
-              {isCheckingAccess ? (
-                <>
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                  Checking Access...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="w-5 h-5" />
-                  Check Access Status
-                </>
+            <div className="space-y-3">
+              <button
+                onClick={handleRefreshAccess}
+                disabled={isCheckingAccess}
+                className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-yellow-800 disabled:cursor-not-allowed text-white py-3 px-6 rounded-lg font-bold transition-all duration-300 flex items-center justify-center gap-3"
+              >
+                {isCheckingAccess ? (
+                  <>
+                    <RefreshCw className="w-5 h-5 animate-spin" />
+                    Checking Access...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-5 h-5" />
+                    {pollCount < MAX_POLLS ? 'Refresh Status' : 'Try Again'}
+                  </>
+                )}
+              </button>
+              
+              {pollCount >= MAX_POLLS && (
+                <button
+                  onClick={() => window.open('mailto:support@cinemarwanda.com')}
+                  className="w-full bg-gray-800 hover:bg-gray-700 text-white py-3 px-6 rounded-lg font-medium transition-all duration-300"
+                >
+                  Contact Support
+                </button>
               )}
-            </button>
+            </div>
           </div>
           
-          <div className="text-center text-sm text-gray-400">
-            If access doesn't appear after a minute, please contact support.
-          </div>
+          {pollCount < MAX_POLLS ? (
+            <div className="text-center text-sm text-gray-400 flex items-center justify-center gap-2">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              Automatically checking for access...
+            </div>
+          ) : (
+            <div className="text-center text-sm text-gray-400">
+              If access doesn't appear after a minute, please contact support.
+            </div>
+          )}
         </div>
       );
     }
@@ -295,18 +368,18 @@ function PaymentSuccess() {
     );
   };
 
-  if (loading) {
+  if (loading && !payment) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-900 to-black text-white flex items-center justify-center">
         <div className="text-center">
           <div className="relative w-32 h-32 mx-auto mb-6">
-            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-ping opacity-20"></div>
-            <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full animate-ping opacity-20"></div>
+            <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full animate-pulse"></div>
             <div className="absolute inset-0 flex items-center justify-center">
               <RefreshCw className="w-16 h-16 animate-spin text-white" />
             </div>
           </div>
-          <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+          <h2 className="text-2xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-blue-400 bg-clip-text text-transparent">
             Loading Payment Details
           </h2>
           <p className="text-gray-400">Please wait while we fetch your transaction...</p>
@@ -357,7 +430,7 @@ function PaymentSuccess() {
       {/* Animated Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {/* Gradient Orbs */}
-        <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/4 -left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
         <div className="absolute bottom-1/4 -right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
         
         {/* Animated Particles */}
@@ -384,8 +457,8 @@ function PaymentSuccess() {
           {/* Success Header */}
           <div className="text-center mb-8 md:mb-12">
             <div className="relative w-24 h-24 md:w-32 md:h-32 mx-auto mb-4 md:mb-6">
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-ping opacity-20"></div>
-              <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full shadow-2xl"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full animate-ping opacity-20"></div>
+              <div className="absolute inset-4 bg-gradient-to-r from-blue-500 to-blue-500 rounded-full shadow-2xl"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <CheckCircle className="w-12 h-12 md:w-16 md:h-16 text-white" />
               </div>
@@ -396,7 +469,7 @@ function PaymentSuccess() {
               Payment Verified & Secured
             </div>
             
-            <h1 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
+            <h1 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 bg-gradient-to-r from-blue-400 via-blue-400 to-pink-400 bg-clip-text text-transparent animate-gradient">
               Payment Successful! 🎉
             </h1>
             <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto px-4">
@@ -485,7 +558,7 @@ function PaymentSuccess() {
               {isSubscription ? (
                 <div className="bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-700/50 p-4 md:p-6">
                   <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 flex items-center">
-                    <Zap className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-purple-400" />
+                    <Zap className="w-5 h-5 md:w-6 md:h-6 mr-2 md:mr-3 text-blue-400" />
                     Subscription Details
                   </h2>
                   
@@ -731,7 +804,7 @@ function PaymentSuccess() {
               </div>
               
               {/* Quick Stats */}
-              <div className="bg-gradient-to-br from-blue-900/20 to-purple-900/20 backdrop-blur-sm rounded-2xl border border-blue-700/30 p-4 md:p-6">
+              <div className="bg-gradient-to-br from-blue-900/20 to-blue-900/20 backdrop-blur-sm rounded-2xl border border-blue-700/30 p-4 md:p-6">
                 <h3 className="text-lg md:text-xl font-bold mb-3 md:mb-4 flex items-center">
                   <CheckCircle className="w-4 h-4 md:w-5 md:h-5 mr-2 text-blue-400" />
                   Your Purchase

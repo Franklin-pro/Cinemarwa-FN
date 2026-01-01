@@ -46,12 +46,12 @@ const VIDEO_QUALITIES = [
 
 // Currency options
 const CURRENCIES = [
-  { value: 'USD', symbol: '$', label: 'USD ($)' },
-  { value: 'EUR', symbol: '€', label: 'EUR (€)' },
-  { value: 'RWF', symbol: 'FRw', label: 'RWF (FRw)' },
-  { value: 'GHS', symbol: '₵', label: 'GHS (₵)' },
-  { value: 'XOF', symbol: 'CFA', label: 'XOF (CFA)' },
-  { value: 'NGN', symbol: '₦', label: 'NGN (₦)' }
+    { value: 'RWF', symbol: 'FRw', label: 'RWF (FRw)' },
+  // { value: 'USD', symbol: '$', label: 'USD ($)' },
+  // { value: 'EUR', symbol: '€', label: 'EUR (€)' },
+  // { value: 'GHS', symbol: '₵', label: 'GHS (₵)' },
+  // { value: 'XOF', symbol: 'CFA', label: 'XOF (CFA)' },
+  // { value: 'NGN', symbol: '₦', label: 'NGN (₦)' }
 ];
 
 // Age restrictions
@@ -89,6 +89,7 @@ function UploadMovie() {
     release_date: '',
     language: 'en',
     original_language: 'en',
+    youtubeTrailerLink: '',
     
     // Content Type
     contentType: 'movie',
@@ -103,8 +104,8 @@ function UploadMovie() {
     tags: '',
     ageRestriction: 0,
     
-    // Pricing
-    viewPrice: 0,
+    // Pricing - DEFAULT VIEW PRICE SET TO 100
+    viewPrice: 100,
     downloadPrice: 0,
     currency: 'USD',
     royaltyPercentage: 70,
@@ -316,6 +317,15 @@ function UploadMovie() {
       newErrors.description = 'Description must be at least 20 characters';
     }
 
+    // YouTube trailer link validation (optional)
+    if (formData.youtubeTrailerLink && formData.youtubeTrailerLink.trim()) {
+      const yt = formData.youtubeTrailerLink.trim();
+      const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+(&.*)?$/;
+      if (!ytRegex.test(yt)) {
+        newErrors.youtubeTrailerLink = 'Please enter a valid YouTube link';
+      }
+    }
+
     // Series validation for episodes
     if (formData.contentType === 'episode') {
       if (!formData.seriesId) {
@@ -366,8 +376,8 @@ function UploadMovie() {
     const isSeries = formData.contentType === 'series';
     
     if (isMovie) {
-      if (formData.viewPrice < 0) {
-        newErrors.viewPrice = 'View price cannot be negative';
+      if (formData.viewPrice < 100) {
+        newErrors.viewPrice = 'View price must be at least 100 RWF';
       }
       
       if (formData.downloadPrice < 0) {
@@ -376,8 +386,8 @@ function UploadMovie() {
     }
     
     if (isSeries) {
-      if (formData.viewPrice < 0) {
-        newErrors.viewPrice = 'Series price cannot be negative';
+      if (formData.viewPrice < 100) {
+        newErrors.viewPrice = 'Series price must be at least 100 RWF';
       }
     }
     
@@ -429,6 +439,7 @@ function UploadMovie() {
       formDataToSend.append('videoQuality', formData.videoQuality);
       formDataToSend.append('videoDuration', formData.videoDuration);
       formDataToSend.append('ageRestriction', formData.ageRestriction);
+      formDataToSend.append('youtubeTrailerLink', formData.youtubeTrailerLink);
 
       // Handle content type specific fields
       if (isMovie) {
@@ -492,12 +503,6 @@ function UploadMovie() {
       if (videoFile && (isMovie || isEpisode)) formDataToSend.append('videoFile', videoFile);
       if (posterFile) formDataToSend.append('posterFile', posterFile);
       if (backdropFile) formDataToSend.append('backdropFile', backdropFile);
-
-      console.log('Uploading... Content type:', formData.contentType);
-      console.log('Form data entries:');
-      for (let pair of formDataToSend.entries()) {
-        console.log(pair[0] + ': ', pair[1]);
-      }
       
       // Dispatch upload action
       await dispatch(uploadMovie(formDataToSend)).unwrap();
@@ -523,8 +528,9 @@ function UploadMovie() {
       totalSeasons: 1,
       categories: [],
       tags: '',
+      youtubeTrailerLink: '',
       ageRestriction: 0,
-      viewPrice: 0,
+      viewPrice: 100, // Changed from 0 to 100
       downloadPrice: 0,
       currency: 'USD',
       royaltyPercentage: 70,
@@ -586,7 +592,7 @@ function UploadMovie() {
                 seriesId: '',
                 seasonNumber: '',
                 episodeNumber: '',
-                viewPrice: 0,
+                viewPrice: 100, // Changed from 0 to 100
                 downloadPrice: 0
               }));
               setSelectedSeries(null);
@@ -613,7 +619,7 @@ function UploadMovie() {
                 seriesId: '',
                 seasonNumber: '',
                 episodeNumber: '',
-                viewPrice: 10, // Default series price
+                viewPrice: 100, // Changed from 10 to 100
                 downloadPrice: 0
               }));
               setSelectedSeries(null);
@@ -946,6 +952,29 @@ function UploadMovie() {
         <p className="text-gray-400 text-xs mt-1">Helps users discover your content</p>
       </div>
 
+      {/* YouTube Trailer Link (Optional) */}
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          <Video className="w-4 h-4 inline mr-2" />
+          YouTube Trailer (optional)
+        </label>
+        <input
+          type="url"
+          name="youtubeTrailerLink"
+          value={formData.youtubeTrailerLink}
+          onChange={handleInputChange}
+          placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
+          className={`w-full px-4 py-3 bg-gray-800/50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.youtubeTrailerLink ? 'border-red-500' : 'border-gray-700'}`}
+        />
+        {errors.youtubeTrailerLink && (
+          <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.youtubeTrailerLink}
+          </p>
+        )}
+        <p className="text-gray-400 text-xs mt-1">Paste a YouTube link to show a trailer on your content page</p>
+      </div>
+
       {/* Age Restriction */}
       <div>
         <label className="block text-sm font-medium mb-2">Age Restriction</label>
@@ -1031,8 +1060,8 @@ function UploadMovie() {
             Pricing Information
           </h3>
           <p className="text-gray-400 text-sm">
-            {isMovie && "Set pricing for your movie. Set to 0 for free content."}
-            {isSeries && "Set the series price. Users purchase the series to access all episodes."}
+            {isMovie && "Set pricing for your movie. Minimum price is 100 RWF."}
+            {isSeries && "Set the series price. Minimum price is 100 RWF. Users purchase the series to access all episodes."}
             {isEpisode && (
               <span className="text-blue-400">
                 ⓘ Episode pricing is inherited from the series. Users purchase the series to access all episodes.
@@ -1047,6 +1076,7 @@ function UploadMovie() {
           <select
             name="currency"
             value={formData.currency}
+            disabled
             onChange={handleInputChange}
             className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
           >
@@ -1065,22 +1095,22 @@ function UploadMovie() {
               <Eye className="w-4 h-4" />
               {isMovie ? 'Movie View Price *' : 'Series Price *'}
               <span className="text-xs font-normal text-gray-400">
-                {isMovie ? '(Price to watch movie online)' : '(Price to purchase entire series)'}
+                {isMovie ? '(Minimum price: 100 RWF)' : '(Minimum price: 100 RWF - Price to purchase entire series)'}
               </span>
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                {CURRENCIES.find(c => c.value === formData.currency)?.symbol || '$'}
+                {'RWF'}
               </span>
               <input
                 type="number"
                 name="viewPrice"
                 value={formData.viewPrice}
                 onChange={handleInputChange}
-                placeholder={isMovie ? "0.00" : "10.00"}
-                step="0.01"
-                min="0"
-                className={`w-full pl-10 pr-4 py-3 bg-gray-800/50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${
+                placeholder="100"
+                step="1"
+                min="100"
+                className={`w-full pl-15 pr-4 py-3 bg-gray-800/50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${
                   errors.viewPrice ? 'border-red-500' : 'border-gray-700'
                 }`}
               />
@@ -1094,6 +1124,7 @@ function UploadMovie() {
             {isSeries && (
               <p className="text-blue-400 text-xs mt-1">
                 Users who purchase this series will have access to all episodes.
+                Minimum price: 100 RWF
               </p>
             )}
           </div>
@@ -1114,7 +1145,7 @@ function UploadMovie() {
                   <div className="mt-2 p-2 bg-gray-800/50 rounded">
                     <p className="text-xs text-gray-300">
                       Series Price: {CURRENCIES.find(c => c.value === formData.currency)?.symbol || '$'}
-                      {selectedSeries.viewPrice || 0}
+                      {selectedSeries.viewPrice || 100}
                     </p>
                   </div>
                 )}
@@ -1532,6 +1563,11 @@ function UploadMovie() {
               <span className="text-gray-400">Title:</span>
               <span className="font-medium">{formData.title || 'Not set'}</span>
             </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-400">Trailer:</span>
+              <span className="font-medium">{formData.youtubeTrailerLink ? '✓ Set' : '✗ Missing'}</span>
+            </div>
             
             {!isEpisode && (
               <div className="flex justify-between">
@@ -1543,7 +1579,7 @@ function UploadMovie() {
             <div className="flex justify-between">
               <span className="text-gray-400">{isSeries ? 'Series Price:' : 'View Price:'}</span>
               <span className="font-medium">
-                {CURRENCIES.find(c => c.value === formData.currency)?.symbol || '$'}
+                {CURRENCIES.find(c => c.value === formData.currency)?.symbol || 'RWF'}
                 {formData.viewPrice.toFixed(2)}
               </span>
             </div>
@@ -1707,19 +1743,21 @@ function UploadMovie() {
 
           {/* Upload Progress Bar */}
           {uploadLoading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Upload Progress</span>
-                <span className="font-medium">{uploadProgress}%</span>
+            <div className="mt-4">
+              <div className="flex justify-between text-sm mb-1">
+                <span>Uploading movie…</span>
+                <span>{uploadProgress}%</span>
               </div>
-              <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+
+              <div className="w-full bg-gray-300 rounded-full h-3">
                 <div
-                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-full rounded-full transition-all duration-300"
+                  className="bg-blue-600 h-3 rounded-full transition-all"
                   style={{ width: `${uploadProgress}%` }}
                 />
               </div>
-              <p className="text-gray-400 text-sm">
-                Please don't close this window until upload is complete.
+
+              <p className="text-xs text-gray-500 mt-1">
+                Please don't close this window
               </p>
             </div>
           )}

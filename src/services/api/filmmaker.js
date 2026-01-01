@@ -26,6 +26,7 @@ export const filmmmakerService = {
   getStats: () => filmmmakerAPI.get('/stats'),
   getSeriesEpisodes: (seriesId) => filmmmakerAPI.get(`/series/${seriesId}/episodes`),
   getNotifications : ()=> filmmmakerAPI.get('/notifications'),
+  getFilmmakerAnalytics: () => filmmmakerAPI.get('/analytics'),
 
 
   // ====== PAYMENT METHOD ======
@@ -41,6 +42,8 @@ export const filmmmakerService = {
   getMovies: () => filmmmakerAPI.get('/movies'),
   editMovie: (movieId, data) => filmmmakerAPI.put(`/movies/${movieId}`, data),
   getCategories: (categoryId) => filmmmakerAPI.get(`/category/${categoryId}`),
+  shareMovie: (movieId) => filmmmakerAPI.post(`/${movieId}/share`),
+
 };
 
 export default filmmmakerService;

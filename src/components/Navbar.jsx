@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { logoutAll } from "../store/slices/authSlice";
 import { searchBackendMovies } from "../services/api";
 import { useMovies } from "../context/MovieContext";
+import cinemaLogo from "../assets/cinerwandaLogo.png";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -68,7 +69,7 @@ const Navbar = () => {
       ]
     : [
         { id: "home", label: "Home",path:"/" },
-        { id: "topRated", label: "Top Rated" },
+        // { id: "topRated", label: "Top Rated" },
         { id: "trending", label: "Trending" },
         { id: "popular", label: "Popular" }
       ];
@@ -152,8 +153,7 @@ const Navbar = () => {
           onClick={() => navigate('/')}
           className="flex items-center space-x-1 focus:outline-none"
         >
-          <span className="text-blue-500 font-bold text-2xl">Cine</span>
-          <span className="text-white font-bold text-2xl">Verse</span>
+          <img src={cinemaLogo} alt="logo" className="w-24 h-14 object-cover" />
         </button>
 
         {/* Desktop Navigation */}
@@ -264,7 +264,7 @@ const Navbar = () => {
                 onClick={toggleProfile}
                 className="flex items-center space-x-2 px-3 py-2 rounded-full bg-neutral-800 hover:bg-neutral-700 transition text-white focus:outline-none"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
                   <User size={16} />
                 </div>
                 <span className="text-sm">{user?.name?.split(' ')[0] || "User"}</span>
@@ -297,7 +297,7 @@ const Navbar = () => {
                   {user?.role === 'admin' && (
                     <button
                       onClick={handleAdminDashboardClick}
-                      className="w-full text-left px-4 py-2 text-sm text-purple-400 hover:bg-neutral-700 transition flex items-center space-x-2 focus:outline-none border-t border-neutral-700"
+                      className="w-full text-left px-4 py-2 text-sm text-blue-400 hover:bg-neutral-700 transition flex items-center space-x-2 focus:outline-none border-t border-neutral-700"
                     >
                       <BarChart3 size={16} />
                       <span>Admin Dashboard</span>
@@ -461,7 +461,7 @@ const Navbar = () => {
                   {user?.role === 'admin' && (
                     <button
                       onClick={handleAdminDashboardClick}
-                      className="w-full text-left px-4 py-2 text-sm text-purple-400 hover:bg-neutral-700 transition flex items-center space-x-2 focus:outline-none"
+                      className="w-full text-left px-4 py-2 text-sm text-blue-400 hover:bg-neutral-700 transition flex items-center space-x-2 focus:outline-none"
                     >
                       <BarChart3 size={16} />
                       <span>Admin Dashboard</span>

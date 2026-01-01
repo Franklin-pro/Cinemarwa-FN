@@ -403,9 +403,9 @@ function WithdrawalHistory() {
                 </span>
               )}
               {selectedPeriod !== 'all' && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 rounded-full text-sm">
+                <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-full text-sm">
                   Period: {getPeriodLabel(selectedPeriod)}
-                  <button onClick={() => setSelectedPeriod('all')} className="ml-1 text-purple-500 hover:text-purple-700">
+                  <button onClick={() => setSelectedPeriod('all')} className="ml-1 text-blue-500 hover:text-blue-700">
                     <X className="w-3 h-3" />
                   </button>
                 </span>

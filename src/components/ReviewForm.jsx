@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { addReview, rateMovie } from '../store/slices/movieSlice';
+import { addReview } from '../store/slices/movieSlice';
 import { Star } from 'lucide-react';
 
 function ReviewForm({ movieId, onReviewAdded }) {
@@ -9,7 +9,7 @@ function ReviewForm({ movieId, onReviewAdded }) {
   const { loading } = useSelector((state) => state.movies);
 
   const [formData, setFormData] = useState({
-    title: '',
+    review: '',
     content: '',
     rating: 5,
   });
@@ -38,8 +38,8 @@ function ReviewForm({ movieId, onReviewAdded }) {
     setSuccess('');
 
     // Validate form
-    if (!formData.title.trim()) {
-      setError('Review title is required');
+    if (!formData.review.trim()) {
+      setError('Review review is required');
       return;
     }
     if (!formData.content.trim()) {
@@ -57,23 +57,15 @@ function ReviewForm({ movieId, onReviewAdded }) {
         addReview({
           movieId,
           reviewData: {
-            title: formData.title,
+            review: formData.review,
             content: formData.content,
             rating: formData.rating,
           },
         })
       ).unwrap();
 
-      // Also submit the rating separately
-      await dispatch(
-        rateMovie({
-          movieId,
-          rating: formData.rating,
-        })
-      ).unwrap();
-
       setSuccess('Review added successfully!');
-      setFormData({ title: '', content: '', rating: 5 });
+      setFormData({ review: '', content: '', rating: 5 });
 
       if (onReviewAdded) {
         onReviewAdded(reviewResult);
@@ -149,15 +141,15 @@ function ReviewForm({ movieId, onReviewAdded }) {
           </label>
           <input
             type="text"
-            name="title"
-            value={formData.title}
+            name="review"
+            value={formData.review}
             onChange={handleInputChange}
             placeholder="What's the main point?"
             className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
             maxLength={100}
           />
           <p className="text-xs text-gray-400 mt-1">
-            {formData.title.length}/100 characters
+            {formData.review.length}/100 characters
           </p>
         </div>
 

@@ -41,7 +41,9 @@ export const authService = {
     verifyOTP: (data) => {
         const deviceFingerprint = getOrCreateDeviceFingerprint();
         return authAPI.post('/verify-otp', { ...data, deviceFingerprint });
+        
     },
+    deleteAccount: () => authAPI.delete('/delete-account'),
     
     logout: () => {
         return authAPI.post('/logout').then(() => {
@@ -61,8 +63,10 @@ export const authService = {
     },
     
     getCurrentUser: () => authAPI.get('/me'),
+    changePassword: (data) => authAPI.post('/change-password', data),
     
     getActiveDevices: () => authAPI.get('/devices'),
+    upgradeuser: () => authAPI.post('/upgrade-user'),
     
     removeDevice: (deviceId) => authAPI.delete(`/devices/${deviceId}`),
 };

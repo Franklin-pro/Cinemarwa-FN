@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { getMovieReviews } from '../store/slices/movieSlice';
+// import { getMovieReviews } from '../store/slices/movieSlice';
 import { Star, MessageSquare, ThumbsUp } from 'lucide-react';
 
 function ReviewList({ movieId }) {
@@ -10,7 +10,7 @@ function ReviewList({ movieId }) {
 
   useEffect(() => {
     if (movieId) {
-      dispatch(getMovieReviews(movieId));
+      // dispatch(getMovieReviews(movieId));
     }
   }, [movieId, dispatch]);
 
