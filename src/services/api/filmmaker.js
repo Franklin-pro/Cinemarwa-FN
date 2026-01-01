@@ -42,6 +42,8 @@ export const filmmmakerService = {
   getMovies: () => filmmmakerAPI.get('/movies'),
   editMovie: (movieId, data) => filmmmakerAPI.put(`/movies/${movieId}`, data),
   getCategories: (categoryId) => filmmmakerAPI.get(`/category/${categoryId}`),
+  shareMovie: (movieId) => filmmmakerAPI.post(`/${movieId}/share`),
+
 };
 
 export default filmmmakerService;

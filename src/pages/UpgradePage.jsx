@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
+import { loadStripe } from '@stripe/stripe-js';
+import {
+  Elements,
+  CardElement,
+  useStripe,
+  useElements,
+} from '@stripe/react-stripe-js';
 import {  
   processSubscriptionMomoPayment,
   processSubscriptionStripePayment,
@@ -22,17 +29,24 @@ import {
   User,
   Zap,
   Crown,
-  Star
+  Star,
+  Calendar,
+  Clock
 } from 'lucide-react';
 
-// Enhanced Plans Configuration
+// Initialize Stripe with your publishable key
+const stripePromise = loadStripe('pk_test_51PWDtVACBJNi3q8ryB7BJr0zXmsCZnyoHgnaOnAVtJ4qYRpTAS0kUZtFLmlDZajE8BJpwCnu53WS1UpUlJhIuATs00MWAIo7bP');
+
+// Enhanced Plans Configuration with Annual/Monthly Pricing
 const PLANS = [
   {
     id: 'free',
     name: 'Starter',
     tagline: 'Begin Your Journey',
-    price: 0,
-    priceRwf: 0,
+    monthlyPrice: 0,
+    monthlyPriceRwf: 0,
+    annualPrice: 0,
+    annualPriceRwf: 0,
     period: 'month',
     description: 'Perfect for getting started with basic access',
     features: [
@@ -46,7 +60,8 @@ const PLANS = [
     color: 'gray',
     popular: false,
     maxDevices: 1,
-    stripePriceId: null,
+    stripeMonthlyPriceId: null,
+    stripeAnnualPriceId: null,
     icon: Star,
     gradient: 'from-gray-400 to-gray-600',
     badge: null,
@@ -58,26 +73,25 @@ const PLANS = [
     id: 'pro',
     name: 'Professional',
     tagline: 'Elevate Your Experience',
-    price: 29,
-    priceRwf: 35000,
-    annuallyDiscountedPrice: 299,
-    annuallyDiscountedPriceRwf: 360000,
-    period: 'month',
+    monthlyPrice: 29,
+    monthlyPriceRwf: 100,
+    annualPrice: 290,
+    annualPriceRwf: 1000,
+    period: 'year',
     description: 'Most popular choice for serious movie lovers',
     features: [
       'Full HD streaming (1080p)',
       'Watch on 4 devices simultaneously',
       'Ad-free experience',
-      'Download unlimited movies',
       'Priority customer support',
       'Early access to new releases',
-      'Custom watchlists & profiles',
       '4K upgrade available'
     ],
     color: 'blue',
     popular: true,
     maxDevices: 4,
-    stripePriceId: 'price_pro_monthly',
+    stripeMonthlyPriceId: 'price_pro_monthly',
+    stripeAnnualPriceId: 'price_pro_annually',
     icon: Crown,
     gradient: 'from-blue-500 to-blue-600',
     badge: 'Most Popular',
@@ -89,11 +103,11 @@ const PLANS = [
     id: 'max',
     name: 'Ultimate',
     tagline: 'The Complete Experience',
-    price: 99,
-    priceRwf: 120000,
-    annuallyDiscountedPrice: 999,
-    annuallyDiscountedPriceRwf: 1200000,
-    period: 'month',
+    monthlyPrice: 99,
+    monthlyPriceRwf: 150,
+    annualPrice: 990,
+    annualPriceRwf: 1500,
+    period: 'year',
     description: 'Unlimited access for the ultimate entertainment',
     features: [
       '4K Ultra HD streaming',
@@ -110,7 +124,8 @@ const PLANS = [
     color: 'blue',
     popular: false,
     maxDevices: 10,
-    stripePriceId: 'price_enterprise_monthly',
+    stripeMonthlyPriceId: 'price_enterprise_monthly',
+    stripeAnnualPriceId: 'price_enterprise_annually',
     icon: Zap,
     gradient: 'from-blue-600 to-green-600',
     badge: 'Premium',
@@ -121,7 +136,7 @@ const PLANS = [
 ];
 
 // Helper functions
-const getCurrencySymbol = (currency) => currency === 'rwf' ? 'RWF' : '$';
+// const getCurrencySymbol = (currency) => currency === 'rwf' ? 'RWF' : '$';
 
 const formatRwfAmount = (amount) => {
   return parseInt(amount).toLocaleString('en-RW');
@@ -143,6 +158,182 @@ const formatPhoneForBackend = (phone) => {
   return phone;
 };
 
+// New helper functions for pricing
+const getPrice = (plan, billingCycle, currency) => {
+  if (plan.id === 'free') return 0;
+  
+  if (billingCycle === 'yearly') {
+    return currency === 'rwf' ? plan.annualPriceRwf : plan.annualPrice;
+  }
+  return currency === 'rwf' ? plan.monthlyPriceRwf : plan.monthlyPrice;
+};
+
+const getPriceDisplay = (plan, billingCycle, currency) => {
+  const price = getPrice(plan, billingCycle, currency);
+  if (currency === 'rwf') {
+    return formatRwfAmount(price);
+  }
+  return price;
+};
+
+const calculateMonthlyEquivalent = (annualPrice, currency) => {
+  const monthly = annualPrice / 12;
+  if (currency === 'rwf') {
+    return Math.round(monthly);
+  }
+  return monthly.toFixed(2);
+};
+
+const calculateMonthlySavings = (plan, billingCycle, currency) => {
+  if (plan.id === 'free' || billingCycle !== 'yearly') return 0;
+  
+  const monthlyTotal = (currency === 'rwf' ? plan.monthlyPriceRwf : plan.monthlyPrice) * 12;
+  const annualPrice = currency === 'rwf' ? plan.annualPriceRwf : plan.annualPrice;
+  
+  return monthlyTotal - annualPrice;
+};
+
+// Stripe Card Form Component
+const CheckoutForm = ({ 
+  selectedPlan, 
+  billingCycle, 
+  handleCardPaymentSubmit, 
+  isProcessing,
+  localLoading 
+}) => {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [cardError, setCardError] = useState('');
+  const [cardComplete, setCardComplete] = useState(false);
+  const [cardHolderName, setCardHolderName] = useState('');
+  const [nameError, setNameError] = useState('');
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    
+    if (!stripe || !elements) {
+      return;
+    }
+
+    // Validate card holder name
+    if (!cardHolderName.trim()) {
+      setNameError('Card holder name is required');
+      return;
+    }
+    setNameError('');
+
+    const cardElement = elements.getElement(CardElement);
+    
+    const { error, paymentMethod } = await stripe.createPaymentMethod({
+      type: 'card',
+      card: cardElement,
+      billing_details: {
+        name: cardHolderName,
+      },
+    });
+
+    if (error) {
+      setCardError(error.message);
+      return;
+    }
+
+    setCardError('');
+    // Pass the payment method ID to parent component
+    handleCardPaymentSubmit(paymentMethod.id);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Card Holder Name */}
+      <div className="mb-4">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Card Holder Name
+        </label>
+        <input
+          type="text"
+          value={cardHolderName}
+          onChange={(e) => {
+            setCardHolderName(e.target.value);
+            if (nameError) setNameError('');
+          }}
+          placeholder="John Doe"
+          disabled={isProcessing || localLoading}
+          className={`w-full px-4 py-3 bg-[#1a1a1a] border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-500 ${
+            nameError ? 'border-red-500' : 'border-gray-600'
+          } ${isProcessing || localLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        />
+        {nameError && (
+          <p className="mt-2 text-sm text-red-400">{nameError}</p>
+        )}
+      </div>
+
+      {/* Card Details */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-300 mb-2">
+          Card Details
+        </label>
+        <div className="bg-[#1a1a1a] border border-gray-600 rounded-lg p-3">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: '16px',
+                  color: '#ffffff',
+                  '::placeholder': {
+                    color: '#9ca3af',
+                  },
+                  ':-webkit-autofill': {
+                    color: '#ffffff',
+                  },
+                },
+                invalid: {
+                  color: '#ef4444',
+                },
+              },
+              hidePostalCode: true,
+            }}
+            onChange={(e) => {
+              setCardError(e.error ? e.error.message : '');
+              setCardComplete(e.complete);
+            }}
+          />
+        </div>
+        {cardError && (
+          <p className="mt-2 text-sm text-red-400 flex items-center">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            {cardError}
+          </p>
+        )}
+        <p className="text-xs text-gray-400 mt-2">
+          💡 Test card: 4242 4242 4242 4242 | Exp: Any future date | CVC: Any 3 digits
+        </p>
+      </div>
+
+      <button
+        type="submit"
+        disabled={!stripe || !cardComplete || isProcessing || localLoading || !cardHolderName.trim()}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+      >
+        {isProcessing || localLoading ? (
+          <>
+            <Loader2 className="animate-spin h-6 w-6 mr-3" />
+            Processing Payment...
+          </>
+        ) : (
+          <>
+            <CreditCard className="w-5 h-5 mr-2" />
+            Pay ${getPrice(selectedPlan, billingCycle, 'usd')}
+            <span className="ml-2 text-sm opacity-80">
+              ({billingCycle === 'yearly' ? 'annual' : 'monthly'})
+            </span>
+          </>
+        )}
+      </button>
+    </form>
+  );
+};
+
+// Main UpgradePage Component
 function UpgradePage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -185,6 +376,7 @@ function UpgradePage() {
   const [showLoginPrompt, setShowLoginPrompt] = useState(!isAuthenticated());
   const [formErrors, setFormErrors] = useState({});
   const [localLoading, setLocalLoading] = useState(false);
+  const [showCardForm, setShowCardForm] = useState(true);
 
   // Auto-set currency based on payment method
   const currency = paymentMethod === 'momo' ? 'rwf' : 'usd';
@@ -239,15 +431,6 @@ function UpgradePage() {
     }
   }, [error]);
 
-  const handlePlanSelect = (plan) => {
-    if (plan.id === 'free') {
-      navigate('/register');
-      return;
-    }
-    setSelectedPlan(plan);
-    dispatch(clearError());
-    setFormErrors({});
-  };
 
   const handleGetPlanClick = (plan) => {
     if (plan.id === 'free') {
@@ -264,94 +447,122 @@ function UpgradePage() {
     dispatch(clearTransaction());
     setShowPaymentForm(true);
     setLocalLoading(false);
+    setShowCardForm(true);
+    setPaymentMethod('card');
+    setPhoneNumber('');
   };
 
   const handleLoginRedirect = () => {
     sessionStorage.setItem('upgradeRedirect', JSON.stringify({
       planId: selectedPlan.id,
-      price: currency === 'rwf' ? selectedPlan.priceRwf : selectedPlan.price,
-      currency
+      price: getPrice(selectedPlan, billingCycle, currency),
+      currency,
+      billingCycle
     }));
     navigate('/login?redirect=/upgrade');
   };
 
-  const handlePaymentSubmit = async (e) => {
-    e.preventDefault();
-    
+  const handleCardPaymentSubmit = async () => {
     if (!isAuthenticated()) {
       setShowLoginPrompt(true);
       return;
     }
-    
+
     const user = getCurrentUser();
     if (!user) {
       setShowLoginPrompt(true);
       return;
     }
-    
-    // Clear previous errors
+
     dispatch(clearError());
     setFormErrors({});
     setLocalLoading(true);
-    
-    // Determine amount based on currency
-    const amount = currency === 'rwf' ? selectedPlan.priceRwf : selectedPlan.price;
-    
-    // Format amount for MoMo (whole numbers for RWF)
-    const formattedAmount = paymentMethod === 'momo' ? parseInt(amount) : amount;
-    
-    // Build payment data object
-    const paymentData = {
-      amount: formattedAmount,
-      currency: paymentMethod === 'momo' ? 'RWF' : currency.toUpperCase(),
+
+    const amount = getPrice(selectedPlan, billingCycle, 'usd');
+
+
+    const stripePaymentData = {
+      amount: amount,
+      currency: 'USD',
       planId: selectedPlan.id,
-      period: selectedPlan.period,
+      period: billingCycle === 'yearly' ? 'year' : 'month',
       type: 'subscription_upgrade',
       userId: user.id,
       email: user.email || '',
+      // stripePriceId: stripePriceId,
+      // paymentMethodId: paymentMethodId,
       metadata: {
         planName: selectedPlan.name,
-        period: selectedPlan.period,
+        period: billingCycle === 'yearly' ? 'year' : 'month',
         maxDevices: selectedPlan.maxDevices,
-        paymentMethod,
-        currency
+        paymentMethod: 'card',
+        currency: 'usd',
+        billingCycle
       }
     };
 
-    if (paymentMethod === 'momo') {
-      // Validate MoMo phone number
-      if (!phoneNumber) {
-        setFormErrors({ phoneNumber: 'Phone number is required for MoMo payments' });
-        setLocalLoading(false);
-        return;
-      }
-      
-      if (!isValidMoMoPhone(phoneNumber)) {
-        setFormErrors({ 
-          phoneNumber: 'Please enter a valid Rwanda MoMo number (078XXXXXXX or 079XXXXXXX)' 
-        });
-        setLocalLoading(false);
-        return;
-      }
-      
-      // Format phone number for backend
-      const formattedPhone = formatPhoneForBackend(phoneNumber);
-      
-      // Create MoMo specific payment data
-      const momoPaymentData = {
-        ...paymentData,
-        phoneNumber: formattedPhone,
-        amount: parseInt(amount)
-      };
-      dispatch(processSubscriptionMomoPayment(momoPaymentData));
-    } else {
-      const stripePaymentData = {
-        ...paymentData,
-        phoneNumber: '',
-        description: `Upgrade to ${selectedPlan.name} Plan`
-      };
-      dispatch(processSubscriptionStripePayment(stripePaymentData));
+    dispatch(processSubscriptionStripePayment(stripePaymentData));
+  };
+
+  const handleMomoPaymentSubmit = async (e) => {
+    e?.preventDefault?.();
+
+    if (!isAuthenticated()) {
+      setShowLoginPrompt(true);
+      return;
     }
+
+    const user = getCurrentUser();
+    if (!user) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    dispatch(clearError());
+    setFormErrors({});
+    setLocalLoading(true);
+
+    const amount = getPrice(selectedPlan, billingCycle, 'rwf');
+
+    // Validate MoMo phone number
+    if (!phoneNumber) {
+      setFormErrors({ phoneNumber: 'Phone number is required for MoMo payments' });
+      setLocalLoading(false);
+      return;
+    }
+    
+    if (!isValidMoMoPhone(phoneNumber)) {
+      setFormErrors({ 
+        phoneNumber: 'Please enter a valid Rwanda MoMo number (078XXXXXXX or 079XXXXXXX)' 
+      });
+      setLocalLoading(false);
+      return;
+    }
+
+    // Format phone number for backend
+    const formattedPhone = formatPhoneForBackend(phoneNumber);
+
+    const momoPaymentData = {
+      amount: parseInt(amount),
+      currency: 'RWF',
+      planId: selectedPlan.id,
+      period: billingCycle === 'yearly' ? 'year' : 'month',
+      type: 'subscription_upgrade',
+      userId: user.id,
+      email: user.email || '',
+      phoneNumber: formattedPhone,
+      metadata: {
+        planName: selectedPlan.name,
+        period: billingCycle === 'yearly' ? 'year' : 'month',
+        maxDevices: selectedPlan.maxDevices,
+        paymentMethod: 'momo',
+        currency: 'rwf',
+        billingCycle
+      }
+      // Note: No stripePriceId for MoMo payments
+    };
+
+    dispatch(processSubscriptionMomoPayment(momoPaymentData));
   };
 
   const getErrorMessage = () => {
@@ -446,32 +657,42 @@ function UpgradePage() {
             Choose Your Plan
           </h1>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-8">
-            Select the plan that works best for you
+            Select the plan that works best for you. Save up to 17% with annual billing!
           </p>
           
           {/* Billing Toggle */}
           {!showPaymentForm && (
-            <div className="inline-flex items-center bg-[#2a2a2a] rounded-full p-1 border border-gray-700">
+            <div className="inline-flex items-center bg-[#2a2a2a] rounded-full p-1 border border-gray-700 mb-6">
               <button
-                onClick={() => setBillingCycle('monthly')}
+                onClick={() => {
+                  setBillingCycle('monthly');
+                  dispatch(clearTransaction());
+                }}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
                   billingCycle === 'monthly' 
-                    ? 'bg-transparent text-white' 
-                    : 'text-gray-400'
+                    ? 'bg-[#3a3a3a] text-white' 
+                    : 'text-gray-400 hover:text-gray-300'
                 }`}
               >
+                <Clock className="w-4 h-4 inline mr-2" />
                 Monthly
               </button>
               <button
-                onClick={() => setBillingCycle('yearly')}
+                onClick={() => {
+                  setBillingCycle('yearly');
+                  dispatch(clearTransaction());
+                }}
                 className={`px-6 py-2 rounded-full text-sm font-medium transition-all ${
                   billingCycle === 'yearly' 
                     ? 'bg-[#3a3a3a] text-white' 
-                    : 'text-gray-400'
+                    : 'text-gray-400 hover:text-gray-300'
                 }`}
               >
+                <Calendar className="w-4 h-4 inline mr-2" />
                 Yearly
-                <span className="ml-2 text-blue-400 text-xs">Save 17%</span>
+                <span className="ml-2 text-green-400 text-xs">
+                  Save {selectedPlan.annualSavings}%
+                </span>
               </button>
             </div>
           )}
@@ -493,7 +714,7 @@ function UpgradePage() {
               Upgrade Successful! 🎉
             </h2>
             <p className="text-gray-400 mb-8">
-              Your {selectedPlan.name} is now active. Redirecting to dashboard...
+              Your {selectedPlan.name} Plan ({billingCycle === 'yearly' ? 'Annual' : 'Monthly'}) is now active. Redirecting to dashboard...
             </p>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
           </div>
@@ -537,15 +758,49 @@ function UpgradePage() {
                     <p className="text-gray-400 text-sm mb-4">{plan.subtitle}</p>
                     
                     <div className="mb-4">
-                      {plan.price === 0 ? (
+                      {plan.id === 'free' ? (
                         <div className="text-4xl font-bold">$0</div>
                       ) : (
                         <div>
+                          <div className="text-2xl text-gray-400 mb-1">
+                            {billingCycle === 'yearly' ? 'Annual' : 'Monthly'} Plan
+                          </div>
                           <div className="text-4xl font-bold">
-                            ${plan.price}
-                            <span className="text-lg text-gray-400 font-normal">
-                              / month {plan.description}
+                            {billingCycle === 'yearly' ? '$' : '$'}{getPriceDisplay(plan, billingCycle, 'usd')}
+                            <span className="text-lg text-gray-400 font-normal ml-2">
+                              / {billingCycle === 'yearly' ? 'year' : 'month'}
                             </span>
+                          </div>
+                          {billingCycle === 'yearly' && plan.annualSavings > 0 && (
+                            <div className="mt-3 space-y-1">
+                              <div className="text-gray-400 line-through text-sm">
+                                ${(plan.monthlyPrice * 12).toFixed(2)} billed monthly
+                              </div>
+                              <div className="text-green-400 text-sm font-semibold">
+                                Save ${calculateMonthlySavings(plan, billingCycle, 'usd')} ({plan.annualSavings}%)
+                              </div>
+                              <div className="text-gray-300 text-sm">
+                                <Clock className="w-3 h-3 inline mr-1" />
+                                Equivalent to ${calculateMonthlyEquivalent(plan.annualPrice, 'usd')}/month
+                              </div>
+                            </div>
+                          )}
+                          
+                          {/* RWF Pricing */}
+                          <div className="mt-4 pt-4 border-t border-gray-700">
+                            <div className="text-sm text-gray-400">Rwandan Francs (RWF)</div>
+                            <div className="text-2xl font-bold">
+                              RWF {getPriceDisplay(plan, billingCycle, 'rwf')}
+                              <span className="text-lg text-gray-400 font-normal ml-2">
+                                / {billingCycle === 'yearly' ? 'year' : 'month'}
+                            </span>
+                            </div>
+                            {billingCycle === 'yearly' && plan.annualSavings > 0 && (
+                              <div className="text-gray-300 text-sm mt-1">
+                                <Clock className="w-3 h-3 inline mr-1" />
+                                Equivalent to RWF {formatRwfAmount(calculateMonthlyEquivalent(plan.annualPriceRwf, 'rwf'))}/month
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -562,7 +817,7 @@ function UpgradePage() {
                         : 'bg-[#3a3a3a] text-white hover:bg-[#4a4a4a]'
                     }`}
                   >
-                    {plan.id === 'free' ? 'Use Claude for free' : `Get ${plan.name} plan`}
+                    {plan.id === 'free' ? 'Use CinemaRWANDA for free' : `Get ${plan.name} plan`}
                   </button>
 
                   <div className="space-y-3">
@@ -573,6 +828,21 @@ function UpgradePage() {
                       </div>
                     ))}
                   </div>
+                  
+                  {plan.highlights && plan.highlights.length > 0 && (
+                    <div className="mt-6 pt-4 border-t border-gray-700">
+                      <div className="text-xs text-gray-400 uppercase tracking-wider mb-2">
+                        Perfect for:
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {plan.highlights.map((highlight, index) => (
+                          <span key={index} className="text-xs bg-blue-600 bg-opacity-20 text-blue-300 px-2 py-1 rounded">
+                            {highlight}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -586,6 +856,8 @@ function UpgradePage() {
                 setFormErrors({});
                 setPhoneNumber('');
                 setLocalLoading(false);
+                setShowCardForm(true);
+                setPaymentMethod('card');
               }}
               className="flex items-center text-gray-400 hover:text-gray-300 mb-6"
             >
@@ -597,18 +869,60 @@ function UpgradePage() {
               <div className="mb-8">
                 <h2 className="text-3xl font-bold mb-2">Complete Payment</h2>
                 <div className="flex items-center justify-between mb-6">
-                  <p className="text-gray-400">
-                    You're upgrading to <span className="font-semibold text-white">{selectedPlan.name}</span>
-                  </p>
+                  <div>
+                    <p className="text-gray-400">
+                      You're upgrading to <span className="font-semibold text-white">{selectedPlan.name}</span>
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {billingCycle === 'yearly' ? (
+                        <span className="flex items-center">
+                          <Calendar className="w-4 h-4 mr-1" />
+                          Annual subscription (12 months)
+                        </span>
+                      ) : (
+                        <span className="flex items-center">
+                          <Clock className="w-4 h-4 mr-1" />
+                          Monthly subscription
+                        </span>
+                      )}
+                    </p>
+                  </div>
                   <div className="text-right">
-                    <span className="text-2xl font-bold">
-                      {currency === 'rwf' ? formatRwfAmount(selectedPlan.priceRwf) : `$${selectedPlan.price}`}
-                    </span>
-                    <span className="text-gray-400 ml-2 text-sm">
-                      {getCurrencySymbol(currency)}
-                    </span>
+                    <div className="text-2xl font-bold">
+                      {paymentMethod === 'momo' 
+                        ? `RWF ${formatRwfAmount(getPrice(selectedPlan, billingCycle, 'rwf'))}`
+                        : `$${getPrice(selectedPlan, billingCycle, 'usd')}`}
+                    </div>
+                    <div className="text-gray-400 text-sm">
+                      {billingCycle === 'yearly' ? 'per year' : 'per month'}
+                    </div>
+                    {billingCycle === 'yearly' && selectedPlan.annualSavings > 0 && (
+                      <div className="text-green-400 text-sm mt-1">
+                        Save {selectedPlan.annualSavings}% vs monthly
+                      </div>
+                    )}
                   </div>
                 </div>
+                
+                {/* Billing Cycle Info */}
+                {billingCycle === 'yearly' && (
+                  <div className="bg-green-500 bg-opacity-10 border border-green-500 rounded-lg p-4 mb-6">
+                    <div className="flex items-start">
+                      <Calendar className="w-5 h-5 text-green-400 mr-2 mt-0.5" />
+                      <div>
+                        <p className="text-green-400 font-medium">Annual Subscription Benefits:</p>
+                        <div className="text-sm text-green-300 mt-1 space-y-1">
+                          <p>• Save {selectedPlan.annualSavings}% compared to monthly billing</p>
+                          <p>• Equivalent to {paymentMethod === 'momo' ? 'RWF ' : '$'}{calculateMonthlyEquivalent(
+                            getPrice(selectedPlan, 'yearly', currency), 
+                            currency
+                          )}/month</p>
+                          <p>• One-time payment for 12 months of access</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Payment Method Selection */}
@@ -619,6 +933,7 @@ function UpgradePage() {
                     type="button"
                     onClick={() => {
                       setPaymentMethod('card');
+                      setShowCardForm(true);
                       setFormErrors({});
                     }}
                     disabled={isProcessing}
@@ -632,7 +947,9 @@ function UpgradePage() {
                       <CreditCard className={`w-10 h-10 mb-3 ${paymentMethod === 'card' ? 'text-blue-400' : 'text-gray-400'}`} />
                       <span className="font-medium text-lg mb-1">Credit/Debit Card</span>
                       <span className="text-sm text-gray-400">Pay in USD</span>
-                      <span className="text-xl font-bold mt-2">${selectedPlan.price}</span>
+                      <span className="text-xl font-bold mt-2">
+                        ${getPrice(selectedPlan, billingCycle, 'usd')}
+                      </span>
                     </div>
                   </button>
                   
@@ -640,6 +957,7 @@ function UpgradePage() {
                     type="button"
                     onClick={() => {
                       setPaymentMethod('momo');
+                      setShowCardForm(false);
                       setFormErrors({});
                     }}
                     disabled={isProcessing}
@@ -653,59 +971,97 @@ function UpgradePage() {
                       <Smartphone className={`w-10 h-10 mb-3 ${paymentMethod === 'momo' ? 'text-green-400' : 'text-gray-400'}`} />
                       <span className="font-medium text-lg mb-1">MoMo Wallet</span>
                       <span className="text-sm text-gray-400">Pay in RWF</span>
-                      <span className="text-xl font-bold mt-2">RWF {formatRwfAmount(selectedPlan.priceRwf)}</span>
+                      <span className="text-xl font-bold mt-2">
+                        RWF {formatRwfAmount(getPrice(selectedPlan, billingCycle, 'rwf'))}
+                      </span>
                     </div>
                   </button>
                 </div>
               </div>
 
-              {/* Phone Number Field */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  <span className="flex items-center">
-                    <Smartphone className={`w-4 h-4 mr-2 ${paymentMethod === 'momo' ? 'text-green-400' : 'text-blue-400'}`} />
-                    {paymentMethod === 'momo' ? 'MoMo Phone Number (Rwanda)' : 'Phone Number'}
-                  </span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => {
-                      setPhoneNumber(e.target.value);
-                      if (formErrors.phoneNumber) {
-                        setFormErrors({});
-                      }
-                    }}
-                    placeholder={paymentMethod === 'momo' ? '078XXXXXXXX' : '+250 78X XXX XXX'}
-                    disabled={isProcessing}
-                    className={`w-full px-4 py-3 bg-[#1a1a1a] border rounded-lg focus:ring-2 ${
-                      paymentMethod === 'momo' ? 'focus:ring-green-500' : 'focus:ring-blue-500'
-                    } focus:border-transparent text-white placeholder-gray-500 ${
-                      formErrors.phoneNumber ? 'border-red-500' : 'border-gray-600'
-                    } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                  />
-                </div>
-                
-                {paymentMethod === 'momo' && (
+              {/* Phone Number Field for MoMo */}
+              {paymentMethod === 'momo' && (
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <span className="flex items-center">
+                      <Smartphone className="w-4 h-4 mr-2 text-green-400" />
+                      MoMo Phone Number (Rwanda)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value);
+                        if (formErrors.phoneNumber) {
+                          setFormErrors({});
+                        }
+                      }}
+                      placeholder="078XXXXXXXX"
+                      disabled={isProcessing}
+                      className={`w-full px-4 py-3 bg-[#1a1a1a] border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent text-white placeholder-gray-500 ${
+                        formErrors.phoneNumber ? 'border-red-500' : 'border-gray-600'
+                      } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    />
+                  </div>
+                  
                   <p className="text-xs text-gray-400 mt-2">
                     💡 Enter your MoMo number starting with 078 or 079 (e.g., 0781234567)
                   </p>
-                )}
-                
-                {formErrors.phoneNumber && (
-                  <div className="mt-2 p-3 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg">
-                    <p className="text-sm text-red-400 flex items-center">
-                      <AlertCircle className="w-4 h-4 mr-2" />
-                      {formErrors.phoneNumber}
-                    </p>
-                  </div>
-                )}
-              </div>
+                  
+                  {formErrors.phoneNumber && (
+                    <div className="mt-2 p-3 bg-red-500 bg-opacity-10 border border-red-500 rounded-lg">
+                      <p className="text-sm text-red-400 flex items-center">
+                        <AlertCircle className="w-4 h-4 mr-2" />
+                        {formErrors.phoneNumber}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Card Form for Stripe */}
+              {paymentMethod === 'card' && showCardForm && (
+                <Elements stripe={stripePromise}>
+                  <CheckoutForm
+                    selectedPlan={selectedPlan}
+                    billingCycle={billingCycle}
+                    handleCardPaymentSubmit={handleCardPaymentSubmit}
+                    isProcessing={isProcessing}
+                    localLoading={localLoading}
+                  />
+                </Elements>
+              )}
+
+              {/* MoMo Submit Button */}
+              {paymentMethod === 'momo' && (
+                <button
+                  type="button"
+                  onClick={handleMomoPaymentSubmit}
+                  disabled={isProcessing || !phoneNumber}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isProcessing || localLoading ? (
+                    <>
+                      <Loader2 className="animate-spin h-6 w-6 mr-3" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Smartphone className="w-5 h-5 mr-2" />
+                      Pay RWF {formatRwfAmount(getPrice(selectedPlan, billingCycle, 'rwf'))} via MoMo
+                      <span className="ml-2 text-sm opacity-80">
+                        ({billingCycle === 'yearly' ? 'annual' : 'monthly'})
+                      </span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {/* Payment Status */}
               {(isProcessing || error || gatewayStatus || success) && (
-                <div className={`mb-6 p-4 rounded-lg border ${getStatusColor()}`}>
+                <div className={`mt-6 p-4 rounded-lg border ${getStatusColor()}`}>
                   <div className="flex items-center">
                     {isProcessing && <Loader2 className="animate-spin h-5 w-5 mr-2" />}
                     {gatewayStatus === 'PENDING' && <AlertCircle className="h-5 w-5 mr-2 text-yellow-400" />}
@@ -723,7 +1079,8 @@ function UpgradePage() {
                         <div>
                           <p className="text-sm text-yellow-400 font-medium">Check your phone</p>
                           <p className="text-xs text-yellow-300 mt-1">
-                            Approve the payment of RWF {formatRwfAmount(selectedPlan.priceRwf)} on your MoMo app
+                            Approve the payment of RWF {formatRwfAmount(getPrice(selectedPlan, billingCycle, 'rwf'))} on your MoMo app
+                            {billingCycle === 'yearly' && ' (Annual subscription)'}
                           </p>
                         </div>
                       </div>
@@ -742,39 +1099,6 @@ function UpgradePage() {
                 </div>
               )}
 
-              {/* Submit Button */}
-              <button
-                type="button"
-                onClick={handlePaymentSubmit}
-                disabled={isProcessing || (paymentMethod === 'momo' && !phoneNumber)}
-                className={`w-full ${
-                  paymentMethod === 'momo' 
-                    ? 'bg-green-600 hover:bg-green-700' 
-                    : 'bg-blue-600 hover:bg-blue-700'
-                } text-white py-4 px-6 rounded-xl font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center`}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="animate-spin h-6 w-6 mr-3" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    {paymentMethod === 'momo' ? (
-                      <>
-                        <Smartphone className="w-5 h-5 mr-2" />
-                        Pay RWF {formatRwfAmount(selectedPlan.priceRwf)} via MoMo
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="w-5 h-5 mr-2" />
-                        Pay ${selectedPlan.price} with Card
-                      </>
-                    )}
-                  </>
-                )}
-              </button>
-
               {/* Security Badge */}
               <div className="mt-8 pt-6 border-t border-gray-700">
                 <div className="flex flex-wrap items-center justify-center gap-6 text-gray-400">
@@ -786,6 +1110,12 @@ function UpgradePage() {
                     <Lock className="w-5 h-5 text-blue-400 mr-2" />
                     <span className="text-sm">256-bit Encryption</span>
                   </div>
+                  {billingCycle === 'yearly' && (
+                    <div className="flex items-center">
+                      <Calendar className="w-5 h-5 text-green-400 mr-2" />
+                      <span className="text-sm">12 Month Access</span>
+                    </div>
+                  )}
                 </div>
                 <p className="text-center text-xs text-gray-500 mt-3">
                   {paymentMethod === 'momo' 
@@ -801,4 +1131,13 @@ function UpgradePage() {
   );
 }
 
-export default UpgradePage;
+// Wrap the component with Elements provider
+const UpgradePageWrapper = () => {
+  return (
+    <Elements stripe={stripePromise}>
+      <UpgradePage />
+    </Elements>
+  );
+};
+
+export default UpgradePageWrapper;

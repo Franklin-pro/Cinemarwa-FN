@@ -147,7 +147,7 @@ export const addReview = createAsyncThunk(
   async ({ movieId, reviewData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/movies/${movieId}/reviews`, reviewData, {
+      const response = await axios.post(`${API_URL}/movies/${movieId}/add-review`, reviewData, {
         headers: { Authorization: `Bearer ${token}` },
       });
       return response.data;
@@ -183,6 +183,25 @@ export const deleteMovie = createAsyncThunk(
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete movie');
+    }
+  }
+);
+// moviesSlice.js - Fix the shareMovies thunk
+export const shareMovies = createAsyncThunk(
+  'movies/shareMovies',
+  async (shareData, { rejectWithValue }) => { // Change parameter name from 'movie' to 'shareData'
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${API_URL}/movies/share`,
+        shareData, // Send the data directly, not nested
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to share movies');
     }
   }
 );
@@ -348,6 +367,17 @@ const movieSlice = createSlice({
         state.loading = false;
       })
       .addCase(rateMovie.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(shareMovies.pending, (state) => {
+        state.loading = true;
+      })
+      .addCase(shareMovies.fulfilled, (state, action) => {
+        state.loading = false;
+        state.userMovies = action.payload;
+      })
+      .addCase(shareMovies.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })

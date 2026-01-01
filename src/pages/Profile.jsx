@@ -4,9 +4,11 @@ import {
   Eye, Download, Star, Edit, 
   LogOut, Settings, Key, Trash2, 
   Moon, Sun, ChevronRight, RefreshCw, EyeOff, Eye as EyeIcon,
-  Smartphone, Plus, AlertCircle, Monitor
+  Smartphone, Plus, AlertCircle, Monitor, CheckCircle
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import toast, { Toaster } from 'react-hot-toast';
+import ConfirmationModal from '../components/ConfirmationModal.jsx';
 
 function Profile() {
   const navigate = useNavigate();
@@ -39,6 +41,17 @@ function Profile() {
   });
   const [changePasswordLoading, setChangePasswordLoading] = useState(false);
   const [changePasswordError, setChangePasswordError] = useState('');
+
+  // Confirmation modal states
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    title: '',
+    message: '',
+    type: 'warning',
+    onConfirm: () => {},
+    confirmText: 'Confirm',
+    cancelText: 'Cancel'
+  });
 
   // Get activeDevices from user object
   const activeDevices = user?.activeDevices || [];
@@ -73,6 +86,32 @@ function Profile() {
     }
   }, [user]);
 
+  // Helper function to show toast notifications
+  const showToast = (message, type = 'success') => {
+    const toastConfig = {
+      duration: 4000,
+      position: 'top-right',
+      style: {
+        background: type === 'success' ? '#10B981' : '#EF4444',
+        color: 'white',
+        borderRadius: '0.5rem',
+        padding: '1rem',
+      },
+    };
+
+    if (type === 'success') {
+      toast.success(message, toastConfig);
+    } else {
+      toast.error(message, toastConfig);
+    }
+  };
+
+  // Helper function to show confirmation modal
+  const showConfirmation = (config) => {
+    setConfirmModalConfig(config);
+    setShowConfirmModal(true);
+  };
+
   // Fetch user data from API
   const fetchUserData = async () => {
     setLoading(true);
@@ -99,8 +138,15 @@ function Profile() {
       const data = await response.json();
       setUser(data.user || data);
       localStorage.setItem('user', JSON.stringify(data.user || data));
+      
+      // Show success toast on refresh
+      if (!loading) {
+        showToast('Profile data refreshed successfully!');
+      }
     } catch (err) {
-      setError(err.message || 'Failed to load profile');
+      const errorMessage = err.message || 'Failed to load profile';
+      setError(errorMessage);
+      showToast(errorMessage, 'error');
       console.error('Error fetching user:', err);
     } finally {
       setLoading(false);
@@ -213,14 +259,16 @@ function Profile() {
       setShowNewPassword(false);
       setShowConfirmPassword(false);
       
-      // Show success message
-      alert('Password changed successfully!');
+      // Show success toast
+      showToast('Password changed successfully!');
       
       // Refresh user data
       await fetchUserData();
     } catch (error) {
       console.error('Password change failed:', error);
-      setChangePasswordError(error.message || 'An error occurred. Please try again.');
+      const errorMessage = error.message || 'An error occurred. Please try again.';
+      setChangePasswordError(errorMessage);
+      showToast(errorMessage, 'error');
     } finally {
       setChangePasswordLoading(false);
     }
@@ -230,111 +278,149 @@ function Profile() {
   const handleRemoveDevice = async (deviceId) => {
     if (!deviceId) {
       console.error('No device ID provided');
+      showToast('No device ID provided', 'error');
       return;
     }
     
-    if (window.confirm('Are you sure you want to remove this device?')) {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/auth/remove-device', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ deviceId })
-        });
+    const device = activeDevices.find(d => d?.deviceId === deviceId);
+    const deviceName = getDeviceName(device) || 'this device';
 
-        if (response.ok) {
-          // Refresh user data to get updated active devices
-          await fetchUserData();
-          alert('Device removed successfully');
-        } else {
-          alert('Failed to remove device');
+    showConfirmation({
+      title: 'Remove Device',
+      message: `Are you sure you want to remove ${deviceName} from your active devices?`,
+      type: 'warning',
+      confirmText: 'Remove Device',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch('http://localhost:5000/api/auth/remove-device', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ deviceId })
+          });
+
+          if (response.ok) {
+            // Refresh user data to get updated active devices
+            await fetchUserData();
+            showToast('Device removed successfully');
+          } else {
+            throw new Error('Failed to remove device');
+          }
+        } catch (error) {
+          console.error('Error removing device:', error);
+          showToast('Error removing device', 'error');
+        } finally {
+          setShowConfirmModal(false);
         }
-      } catch (error) {
-        console.error('Error removing device:', error);
-        alert('Error removing device');
       }
-    }
+    });
   };
 
   // Handle logout from all devices
   const handleLogoutAll = async () => {
-    if (window.confirm('Are you sure you want to logout from all devices?')) {
-      try {
-        const token = localStorage.getItem('token');
-        await fetch('http://localhost:5000/api/auth/logout-all', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        
-        // Clear local storage
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('refreshToken');
-        
-        navigate('/login');
-      } catch (error) {
-        console.error('Error logging out all devices:', error);
-        alert('Error logging out all devices');
-      }
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        await fetch('http://localhost:5000/api/auth/logout', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error during logout:', error);
-    } finally {
-      // Clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('refreshToken');
-      
-      navigate('/login');
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    const confirmDelete = window.confirm('Are you sure you want to delete your account? This action cannot be undone.');
-    if (confirmDelete) {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5000/api/auth/delete-account', {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-
-        if (response.ok) {
+    showConfirmation({
+      title: 'Logout All Devices',
+      message: 'Are you sure you want to logout from all devices? You will need to login again on this device.',
+      type: 'warning',
+      confirmText: 'Logout All',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          await fetch('http://localhost:5000/api/auth/logout-all', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
           // Clear local storage
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           localStorage.removeItem('refreshToken');
           
+          showToast('Logged out from all devices successfully');
           navigate('/login');
-          alert('Account deleted successfully');
-        } else {
-          alert('Failed to delete account');
+        } catch (error) {
+          console.error('Error logging out all devices:', error);
+          showToast('Error logging out all devices', 'error');
+        } finally {
+          setShowConfirmModal(false);
         }
-      } catch (error) {
-        console.error('Error deleting account:', error);
-        alert('Error deleting account');
       }
-    }
+    });
+  };
+
+  const handleLogout = async () => {
+    showConfirmation({
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      type: 'info',
+      confirmText: 'Logout',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          if (token) {
+            await fetch('http://localhost:5000/api/auth/logout', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+          }
+        } catch (error) {
+          console.error('Error during logout:', error);
+        } finally {
+          // Clear local storage
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('refreshToken');
+          
+          showToast('Logged out successfully');
+          navigate('/login');
+          setShowConfirmModal(false);
+        }
+      }
+    });
+  };
+
+  const handleDeleteAccount = async () => {
+    showConfirmation({
+      title: 'Delete Account',
+      message: 'Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently removed.',
+      type: 'danger',
+      confirmText: 'Delete Account',
+      onConfirm: async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch('http://localhost:5000/api/auth/delete-account', {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+
+          if (response.ok) {
+            // Clear local storage
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            localStorage.removeItem('refreshToken');
+            
+            showToast('Account deleted successfully');
+            navigate('/login');
+          } else {
+            throw new Error('Failed to delete account');
+          }
+        } catch (error) {
+          console.error('Error deleting account:', error);
+          showToast('Error deleting account', 'error');
+        } finally {
+          setShowConfirmModal(false);
+        }
+      }
+    });
   };
 
   const handleRefresh = () => {
@@ -343,6 +429,11 @@ function Profile() {
 
   // Handle edit profile submission
   const handleEditProfileSubmit = async () => {
+    if (!editForm.name.trim()) {
+      showToast('Please enter a name', 'error');
+      return;
+    }
+
     try {
       const token = localStorage.getItem('token');
       const response = await fetch('http://localhost:5000/api/auth/update-profile', {
@@ -361,13 +452,13 @@ function Profile() {
         setUser(data.user || data);
         localStorage.setItem('user', JSON.stringify(data.user || data));
         setIsEditing(false);
-        alert('Profile updated successfully!');
+        showToast('Profile updated successfully!');
       } else {
-        alert('Failed to update profile');
+        throw new Error('Failed to update profile');
       }
     } catch (error) {
       console.error('Error updating profile:', error);
-      alert('Error updating profile');
+      showToast('Error updating profile', 'error');
     }
   };
 
@@ -822,7 +913,10 @@ function Profile() {
           </button>
           
           <button 
-            onClick={() => setIsDarkMode(!isDarkMode)}
+            onClick={() => {
+              setIsDarkMode(!isDarkMode);
+              showToast(`Switched to ${!isDarkMode ? 'dark' : 'light'} mode`);
+            }}
             className="w-full flex items-center justify-between p-4 bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50 rounded-xl transition-all group"
           >
             <div className="flex items-center gap-3">
@@ -917,304 +1011,345 @@ function Profile() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
-      {/* Header */}
-      <div className="sticky top-16 z-10 bg-gray-900/80 backdrop-blur-lg border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">Profile Settings</h1>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleRefresh}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-all"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-lg transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
-              </button>
+    <>
+      <Toaster 
+        toastOptions={{
+          duration: 4000,
+          position: 'top-right',
+          style: {
+            background: '#363636',
+            color: '#fff',
+            borderRadius: '10px',
+            border: '1px solid #4B5563',
+          },
+          success: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#10B981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: '#EF4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
+      
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-black text-white">
+        {/* Header */}
+        <div className="sticky top-16 z-10 bg-gray-900/80 backdrop-blur-lg border-b border-gray-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold">Profile Settings</h1>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleRefresh}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-all"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Refresh
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-lg transition-all"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
-          <div className="lg:w-1/4">
-            <div className="bg-gray-800/30 border border-gray-700/50 rounded-2xl p-6 mb-6">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                  <User className="w-8 h-8 text-white" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Sidebar */}
+            <div className="lg:w-1/4">
+              <div className="bg-gray-800/30 border border-gray-700/50 rounded-2xl p-6 mb-6">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold">{user.name || 'User'}</h2>
+                    <p className="text-gray-400">{user.email}</p>
+                    <span className={`mt-1 inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                      user.role === 'admin' ? 'bg-red-500/20 text-red-400' :
+                      user.role === 'filmmaker' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-green-500/20 text-green-400'
+                    }`}>
+                      {user.role || 'user'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-xl font-bold">{user.name || 'User'}</h2>
-                  <p className="text-gray-400">{user.email}</p>
-                  <span className={`mt-1 inline-block px-3 py-1 rounded-full text-xs font-medium ${
-                    user.role === 'admin' ? 'bg-red-500/20 text-red-400' :
-                    user.role === 'filmmaker' ? 'bg-blue-500/20 text-blue-400' :
-                    'bg-green-500/20 text-green-400'
-                  }`}>
-                    {user.role || 'user'}
-                  </span>
+                
+                <div className="space-y-2">
+                  <button
+                    onClick={() => setActiveTab('overview')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      activeTab === 'overview' 
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                        : 'hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <User className="w-5 h-5" />
+                    Overview
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveTab('settings')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      activeTab === 'settings' 
+                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                        : 'hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <Settings className="w-5 h-5" />
+                    Settings
+                  </button>
+                  
+                  <button
+                    onClick={() => setActiveTab('danger')}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+                      activeTab === 'danger' 
+                        ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
+                        : 'hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <Shield className="w-5 h-5" />
+                    Security
+                  </button>
                 </div>
               </div>
               
-              <div className="space-y-2">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === 'overview' 
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                      : 'hover:bg-gray-700/50'
-                  }`}
-                >
-                  <User className="w-5 h-5" />
-                  Overview
-                </button>
-                
-                <button
-                  onClick={() => setActiveTab('settings')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === 'settings' 
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
-                      : 'hover:bg-gray-700/50'
-                  }`}
-                >
-                  <Settings className="w-5 h-5" />
-                  Settings
-                </button>
-                
-                <button
-                  onClick={() => setActiveTab('danger')}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                    activeTab === 'danger' 
-                      ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-                      : 'hover:bg-gray-700/50'
-                  }`}
-                >
-                  <Shield className="w-5 h-5" />
-                  Security
-                </button>
-              </div>
-            </div>
-            
-            {/* Quick Stats */}
-            <div className="bg-gray-800/30 border border-gray-700/50 rounded-2xl p-6">
-              <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Account Age</span>
-                  <span className="font-bold">{getAccountAge()} days</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">User Role</span>
-                  <span className="font-bold capitalize">{user.role || 'user'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Account Type</span>
-                  <span className="font-bold">{user.isUpgraded ? 'Premium' : 'Basic'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-gray-400">Active Devices</span>
-                  <span className="font-bold">{currentDevices}/{maxDevices}</span>
+              {/* Quick Stats */}
+              <div className="bg-gray-800/30 border border-gray-700/50 rounded-2xl p-6">
+                <h3 className="text-lg font-semibold mb-4">Quick Stats</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Account Age</span>
+                    <span className="font-bold">{getAccountAge()} days</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">User Role</span>
+                    <span className="font-bold capitalize">{user.role || 'user'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Account Type</span>
+                    <span className="font-bold">{user.isUpgraded ? 'Premium' : 'Basic'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">Active Devices</span>
+                    <span className="font-bold">{currentDevices}/{maxDevices}</span>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Main Content */}
-          <div className="lg:w-3/4">
-            <div className="bg-gray-800/20 border border-gray-700/50 rounded-2xl p-6">
-              {activeTab === 'overview' && renderOverview()}
-              {activeTab === 'settings' && renderSettings()}
-              {activeTab === 'danger' && renderDangerZone()}
-            </div>
-            
-            {/* Edit Profile Modal */}
-            {isEditing && (
-              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full">
-                  <h3 className="text-xl font-bold mb-4">Edit Profile</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm text-gray-400 mb-1 block">Full Name</label>
-                      <input
-                        type="text"
-                        name="name"
-                        value={editForm.name}
-                        onChange={handleEditChange}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3"
-                        placeholder="Enter your name"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-sm text-gray-400 mb-1 block">Email</label>
-                      <input
-                        type="email"
-                        disabled
-                        value={user.email}
-                        className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-4 py-3 text-gray-400"
-                        placeholder="Email cannot be changed"
-                      />
-                    </div>
-                    <div className="flex gap-3 pt-4">
-                      <button
-                        onClick={() => setIsEditing(false)}
-                        className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-all"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleEditProfileSubmit}
-                        className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
-                      >
-                        Save Changes
-                      </button>
+            {/* Main Content */}
+            <div className="lg:w-3/4">
+              <div className="bg-gray-800/20 border border-gray-700/50 rounded-2xl p-6">
+                {activeTab === 'overview' && renderOverview()}
+                {activeTab === 'settings' && renderSettings()}
+                {activeTab === 'danger' && renderDangerZone()}
+              </div>
+              
+              {/* Edit Profile Modal */}
+              {isEditing && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full">
+                    <h3 className="text-xl font-bold mb-4">Edit Profile</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1 block">Full Name</label>
+                        <input
+                          type="text"
+                          name="name"
+                          value={editForm.name}
+                          onChange={handleEditChange}
+                          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3"
+                          placeholder="Enter your name"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1 block">Email</label>
+                        <input
+                          type="email"
+                          disabled
+                          value={user.email}
+                          className="w-full bg-gray-800/50 border border-gray-700/50 rounded-lg px-4 py-3 text-gray-400"
+                          placeholder="Email cannot be changed"
+                        />
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                        <button
+                          onClick={() => setIsEditing(false)}
+                          className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleEditProfileSubmit}
+                          className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {/* Change Password Modal */}
-            {showChangePassword && (
-              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-                <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-bold flex items-center gap-2">
-                      <Key className="w-5 h-5 text-blue-400" />
-                      Change Password
-                    </h3>
-                    <button
-                      onClick={handleClosePasswordModal}
-                      className="text-gray-400 hover:text-gray-300 transition-colors"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  
-                  <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
-                    {changePasswordError && (
-                      <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                        <p className="text-red-400 text-sm">{changePasswordError}</p>
-                      </div>
-                    )}
-                    
-                    <div>
-                      <label className="text-sm text-gray-400 mb-1 block">
-                        Current Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showCurrentPassword ? "text" : "password"}
-                          name="currentPassword"
-                          value={passwordForm.currentPassword}
-                          onChange={handlePasswordChange}
-                          className={`w-full bg-gray-800 border ${passwordErrors.currentPassword ? 'border-red-500/50' : 'border-gray-700'} rounded-lg px-4 py-3 pr-10`}
-                          placeholder="Enter current password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
-                        >
-                          {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                        </button>
-                      </div>
-                      {passwordErrors.currentPassword && (
-                        <p className="text-red-400 text-xs mt-1">{passwordErrors.currentPassword}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm text-gray-400 mb-1 block">
-                        New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showNewPassword ? "text" : "password"}
-                          name="newPassword"
-                          value={passwordForm.newPassword}
-                          onChange={handlePasswordChange}
-                          className={`w-full bg-gray-800 border ${passwordErrors.newPassword ? 'border-red-500/50' : 'border-gray-700'} rounded-lg px-4 py-3 pr-10`}
-                          placeholder="Enter new password (min. 6 characters)"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowNewPassword(!showNewPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
-                        >
-                          {showNewPassword ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                        </button>
-                      </div>
-                      {passwordErrors.newPassword && (
-                        <p className="text-red-400 text-xs mt-1">{passwordErrors.newPassword}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="text-sm text-gray-400 mb-1 block">
-                        Confirm New Password
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showConfirmPassword ? "text" : "password"}
-                          name="confirmPassword"
-                          value={passwordForm.confirmPassword}
-                          onChange={handlePasswordChange}
-                          className={`w-full bg-gray-800 border ${passwordErrors.confirmPassword ? 'border-red-500/50' : 'border-gray-700'} rounded-lg px-4 py-3 pr-10`}
-                          placeholder="Confirm new password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
-                        </button>
-                      </div>
-                      {passwordErrors.confirmPassword && (
-                        <p className="text-red-400 text-xs mt-1">{passwordErrors.confirmPassword}</p>
-                      )}
-                    </div>
-                    
-                    <div className="flex gap-3 pt-4">
+              )}
+              
+              {/* Change Password Modal */}
+              {showChangePassword && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 max-w-md w-full">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl font-bold flex items-center gap-2">
+                        <Key className="w-5 h-5 text-blue-400" />
+                        Change Password
+                      </h3>
                       <button
-                        type="button"
                         onClick={handleClosePasswordModal}
-                        className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-all"
+                        className="text-gray-400 hover:text-gray-300 transition-colors"
                       >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={changePasswordLoading}
-                        className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {changePasswordLoading ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
-                            Changing...
-                          </>
-                        ) : (
-                          'Change Password'
-                        )}
+                        ✕
                       </button>
                     </div>
-                  </form>
+                    
+                    <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+                      {changePasswordError && (
+                        <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                          <p className="text-red-400 text-sm">{changePasswordError}</p>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1 block">
+                          Current Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showCurrentPassword ? "text" : "password"}
+                            name="currentPassword"
+                            value={passwordForm.currentPassword}
+                            onChange={handlePasswordChange}
+                            className={`w-full bg-gray-800 border ${passwordErrors.currentPassword ? 'border-red-500/50' : 'border-gray-700'} rounded-lg px-4 py-3 pr-10`}
+                            placeholder="Enter current password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
+                          >
+                            {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                          </button>
+                        </div>
+                        {passwordErrors.currentPassword && (
+                          <p className="text-red-400 text-xs mt-1">{passwordErrors.currentPassword}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1 block">
+                          New Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showNewPassword ? "text" : "password"}
+                            name="newPassword"
+                            value={passwordForm.newPassword}
+                            onChange={handlePasswordChange}
+                            className={`w-full bg-gray-800 border ${passwordErrors.newPassword ? 'border-red-500/50' : 'border-gray-700'} rounded-lg px-4 py-3 pr-10`}
+                            placeholder="Enter new password (min. 6 characters)"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
+                          >
+                            {showNewPassword ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                          </button>
+                        </div>
+                        {passwordErrors.newPassword && (
+                          <p className="text-red-400 text-xs mt-1">{passwordErrors.newPassword}</p>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm text-gray-400 mb-1 block">
+                          Confirm New Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            name="confirmPassword"
+                            value={passwordForm.confirmPassword}
+                            onChange={handlePasswordChange}
+                            className={`w-full bg-gray-800 border ${passwordErrors.confirmPassword ? 'border-red-500/50' : 'border-gray-700'} rounded-lg px-4 py-3 pr-10`}
+                            placeholder="Confirm new password"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-400"
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                          </button>
+                        </div>
+                        {passwordErrors.confirmPassword && (
+                          <p className="text-red-400 text-xs mt-1">{passwordErrors.confirmPassword}</p>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-3 pt-4">
+                        <button
+                          type="button"
+                          onClick={handleClosePasswordModal}
+                          className="flex-1 px-4 py-3 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-all"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={changePasswordLoading}
+                          className="flex-1 px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {changePasswordLoading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                              Changing...
+                            </>
+                          ) : (
+                            'Change Password'
+                          )}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={confirmModalConfig.onConfirm}
+        title={confirmModalConfig.title}
+        message={confirmModalConfig.message}
+        type={confirmModalConfig.type}
+        confirmText={confirmModalConfig.confirmText}
+        cancelText={confirmModalConfig.cancelText}
+      />
+    </>
   );
 }
 

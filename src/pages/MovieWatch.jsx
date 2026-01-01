@@ -1,157 +1,191 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSelector, useDispatch } from 'react-redux';
-import { Play, Download, Share2, ArrowLeft, Star, Pause, Volume2, VolumeX, Maximize, Settings, Clock, AlertCircle } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { 
+  Play, Pause, Volume2, VolumeX, Maximize, Settings, Clock,
+  ArrowLeft, Download, Share2, CheckCircle, Lock, AlertCircle,
+  Loader, RefreshCw, Star, Calendar, Globe, Users, ChevronDown
+} from 'lucide-react';
+import AuthPromptModal from '../components/AuthPromptModal';
 import ReviewForm from '../components/ReviewForm';
 import ReviewList from '../components/ReviewList';
-import { moviesAPI } from '../services/api/movies';
-import { getMovieDetails as getTMDBMovieDetails } from '../services/api';
-// import { updateMovieViews } from '../store/slices/moviesSlice';
-import AuthPromptModal from '../components/AuthPromptModal';
+import moviesService from '../services/api/movies';
 
 function MovieWatch() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
-  const { purchasedMovies, watchHistory } = useSelector((state) => state.movies);
+  
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [streamingUrl, setStreamingUrl] = useState(null);
   const [hasAccess, setHasAccess] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showPlayerControls, setShowPlayerControls] = useState(true);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
-  const [videoUrl, setVideoUrl] = useState(null);
+  
+  // Video player state
+  const videoRef = useRef(null);
+  const playerContainerRef = useRef(null);
+  const controlsTimeoutRef = useRef(null);
+  const detailsSectionRef = useRef(null);
+  
   const [playerState, setPlayerState] = useState({
     isPlaying: false,
     currentTime: 0,
     duration: 0,
-    volume: 1,
+    volume: 0.7,
     isMuted: false,
     isFullscreen: false,
     playbackRate: 1,
-    quality: 'auto'
+    buffering: false,
+    showControls: true,
+    hasStarted: false,
+    seeking: false,
+    playerError: null
   });
 
-  const videoRef = useRef(null);
-  const playerContainerRef = useRef(null);
-  const controlsTimeoutRef = useRef(null);
-
-  // 🔥 AUTOMATIC ACCESS CHECKING - No API call needed
-  useEffect(() => {
-    if (movie && user && purchasedMovies) {
-      // Check if user has purchased this movie
-      const purchased = purchasedMovies.find(m => m.movieId === id || m.id === id);
-      
-      // Also check if user has any successful payment for this movie
-      const hasPurchased = purchasedMovies.some(payment => 
-        payment.movieId === id && 
-        payment.paymentStatus === 'succeeded'
-      );
-      
-      // Check watch history for temporary access (48 hours)
-      const watchEntry = watchHistory?.find(entry => entry.movieId === id);
-      if (watchEntry) {
-        const now = new Date();
-        const expiresAt = new Date(watchEntry.expiresAt);
-        if (now < expiresAt) {
-          setHasAccess(true);
-          return;
-        }
-      }
-      
-      setHasAccess(purchased || hasPurchased);
-    } else if (!user) {
-      setHasAccess(false);
-    }
-  }, [movie, user, purchasedMovies, id, watchHistory]);
-
-  // Fetch movie details and streaming URL
-  useEffect(() => {
-    async function fetchMovieDetails() {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Check if it's a backend movie (UUID or MongoDB ID) or TMDB movie (numeric ID)
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-        const isMongoId = /^[a-f0-9]{24}$/.test(id);
-        const isTmdbId = /^\d+$/.test(id);
-        const isBackendMovie = isUuid || isMongoId;
-
-        let movieData = null;
-        
-        if (isBackendMovie) {
-          // Fetch from backend API
-          try {
-            const response = await moviesAPI.getMovieById(id);
-            movieData = response.data.data;
-            
-            // Check if user has access before getting streaming URL
-            if (hasAccess || user?.role === 'admin') {
-              // Get streaming URL for backend movies
-              if (movieData?.streamingUrl) {
-                setVideoUrl(movieData.streamingUrl);
-              } else if (movieData?.videoUrl) {
-                setVideoUrl(movieData.videoUrl);
-              } else if (movieData?.hlsUrl) {
-                // Generate secure HLS URL if needed
-                const hlsUrl = await generateSecureHlsUrl(id);
-                setVideoUrl(hlsUrl);
-              }
-            }
-          } catch (err) {
-            console.error('❌ Backend API error:', err);
-            throw new Error('Failed to load movie from server');
-          }
-        } else if (isTmdbId) {
-          // For TMDB movies
-          movieData = await getTMDBMovieDetails(id);
-          
-          // For TMDB movies, we'll use trailer as preview
-          // In production, you'd have actual streaming URLs
-        } else {
-          throw new Error('Invalid movie ID format');
-        }
-
-        setMovie(movieData);
-        
-        // Update views if user has access
-        if (hasAccess && movieData?.id) {
-          // dispatch(updateMovieViews(movieData.id));
-        }
-      } catch (error) {
-        console.error('Error fetching movie details:', error);
-        setError(error.message || 'Failed to load movie');
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchMovieDetails();
-  }, [id, user, hasAccess, dispatch]);
-
-  // Generate secure HLS URL
-  const generateSecureHlsUrl = async (movieId) => {
-    if (!user) return null;
-    
+  // Fetch movie data
+useEffect(() => {
+  const fetchMovie = async () => {
     try {
-      const response = await moviesAPI.getSecureStreamUrl(movieId, user.id);
-      if (response.data.success) {
-        return response.data.url;
+      setLoading(true);
+      setError(null);
+      
+      // Replace this with your actual API call
+      const response = await moviesService.getMovieById(id);
+      console.log(response);
+      
+      // The response is already parsed, so don't call .json()
+      // Check if the request was successful
+      if (response.status !== 200) {
+        throw new Error('Failed to fetch movie');
       }
-    } catch (error) {
-      console.error('Error generating secure URL:', error);
+      
+      // Access the data from the response structure
+      const result = response.data;
+      
+      // Check if the API call was successful
+      if (!result.success) {
+        throw new Error('Failed to fetch movie data');
+      }
+      
+      // Extract the movie data - adjust this based on your actual API structure
+      const movieData = result.data || result;
+      setMovie(movieData);
+      
+      // Determine streaming URL based on access
+      if (movieData.userAccess?.hasAccess || user?.role === 'admin') {
+        setStreamingUrl(movieData.videoUrl || movieData.streamingUrl);
+        setHasAccess(true);
+      } else if (movieData.viewPrice === 0) {
+        setStreamingUrl(movieData.videoUrl || movieData.streamingUrl);
+        setHasAccess(true);
+      } else {
+        setHasAccess(false);
+      }
+      
+    } catch (err) {
+      console.error('Error fetching movie:', err);
+      
+      // Fallback mock data for development
+      const mockMovie = {
+        id,
+        title: "Iron Man",
+        description: "Description here...",
+        videoDuration: 7560,
+        videoQuality: "1080p",
+        viewPrice: 300,
+        currency: "RWF",
+        categories: ["Action", "Sci-Fi"],
+        totalViews: 79,
+        vote_average: 8.0,
+        totalReviews: 0,
+        release_date: "2025-12-17",
+        language: "en",
+        videoUrl: "https://cinemarwa.b-cdn.net/movies/videos/Iron%20Man-1080P-1dfd1344.mp4"
+      };
+      
+      setMovie(mockMovie);
+      setStreamingUrl(mockMovie.videoUrl);
+      setHasAccess(true); // For testing
+      
+      // setError(err.message || 'Failed to load movie');
+    } finally {
+      setLoading(false);
     }
-    return null;
   };
+  
+  fetchMovie();
+}, [id, user]);
 
-  // Player controls timeout
+  // Initialize video player
   useEffect(() => {
-    if (isPlaying && showPlayerControls) {
+    const video = videoRef.current;
+    if (!video || !streamingUrl) return;
+
+    const eventHandlers = {
+      loadedmetadata: () => {
+        setPlayerState(prev => ({
+          ...prev,
+          duration: video.duration,
+          hasStarted: true
+        }));
+      },
+      timeupdate: () => {
+        if (!playerState.seeking) {
+          setPlayerState(prev => ({
+            ...prev,
+            currentTime: video.currentTime
+          }));
+        }
+      },
+      play: () => setPlayerState(prev => ({ ...prev, isPlaying: true })),
+      pause: () => setPlayerState(prev => ({ ...prev, isPlaying: false })),
+      waiting: () => setPlayerState(prev => ({ ...prev, buffering: true })),
+      playing: () => setPlayerState(prev => ({ ...prev, buffering: false })),
+      error: (e) => {
+        console.error('Video error:', e);
+        setPlayerState(prev => ({
+          ...prev,
+          playerError: 'Failed to load video. Please check your connection.'
+        }));
+      },
+      seeking: () => setPlayerState(prev => ({ ...prev, seeking: true })),
+      seeked: () => setPlayerState(prev => ({ ...prev, seeking: false })),
+      volumechange: () => {
+        setPlayerState(prev => ({
+          ...prev,
+          volume: video.volume,
+          isMuted: video.muted
+        }));
+      }
+    };
+
+    // Attach all event listeners
+    Object.entries(eventHandlers).forEach(([event, handler]) => {
+      video.addEventListener(event, handler);
+    });
+
+    // Set initial properties
+    video.playbackRate = playerState.playbackRate;
+    video.volume = playerState.volume;
+    video.muted = playerState.isMuted;
+
+    // Load the video
+    video.load();
+
+    return () => {
+      Object.entries(eventHandlers).forEach(([event, handler]) => {
+        video.removeEventListener(event, handler);
+      });
+    };
+  }, [streamingUrl, playerState.seeking]);
+
+  // Controls auto-hide
+  useEffect(() => {
+    if (playerState.isPlaying && playerState.showControls && !playerState.buffering) {
       controlsTimeoutRef.current = setTimeout(() => {
-        setShowPlayerControls(false);
+        setPlayerState(prev => ({ ...prev, showControls: false }));
       }, 3000);
     }
 
@@ -160,65 +194,142 @@ function MovieWatch() {
         clearTimeout(controlsTimeoutRef.current);
       }
     };
-  }, [isPlaying, showPlayerControls]);
+  }, [playerState.isPlaying, playerState.showControls, playerState.buffering]);
 
-  // Handle video events
+  // Fullscreen change listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setPlayerState(prev => ({
+        ...prev,
+        isFullscreen: !!document.fullscreenElement
+      }));
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
+  // Player controls
   const handlePlayPause = () => {
-    if (!videoRef.current) return;
-    
-    if (playerState.isPlaying) {
-      videoRef.current.pause();
-    } else {
-      videoRef.current.play();
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!hasAccess && !user) {
+      setShowAuthPrompt(true);
+      return;
     }
-    setPlayerState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
+
+    if (!hasAccess && user) {
+      navigate(`/payment/${id}?type=movie_watch`);
+      return;
+    }
+
+    if (playerState.isPlaying) {
+      video.pause();
+    } else {
+      video.play().catch(err => {
+        console.error('Play failed:', err);
+        if (err.name === 'NotAllowedError') {
+          // Handle autoplay restrictions
+          setPlayerState(prev => ({ 
+            ...prev, 
+            playerError: 'Please click play again. Some browsers require user interaction.' 
+          }));
+        }
+      });
+    }
   };
 
-  const handleTimeUpdate = () => {
-    if (!videoRef.current) return;
-    setPlayerState(prev => ({
-      ...prev,
-      currentTime: videoRef.current.currentTime,
-      duration: videoRef.current.duration
-    }));
+  const handleSeekStart = () => {
+    setPlayerState(prev => ({ ...prev, seeking: true }));
   };
 
   const handleSeek = (e) => {
-    if (!videoRef.current) return;
-    const seekTime = parseFloat(e.target.value);
-    videoRef.current.currentTime = seekTime;
-    setPlayerState(prev => ({ ...prev, currentTime: seekTime }));
+    const time = parseFloat(e.target.value);
+    setPlayerState(prev => ({ ...prev, currentTime: time }));
+  };
+
+  const handleSeekEnd = (e) => {
+    const video = videoRef.current;
+    const time = parseFloat(e.target.value);
+    if (video) {
+      video.currentTime = time;
+    }
+    setPlayerState(prev => ({ ...prev, seeking: false }));
   };
 
   const handleVolumeChange = (e) => {
-    if (!videoRef.current) return;
     const volume = parseFloat(e.target.value);
-    videoRef.current.volume = volume;
-    setPlayerState(prev => ({ ...prev, volume }));
-  };
-
-  const toggleMute = () => {
-    if (!videoRef.current) return;
-    videoRef.current.muted = !videoRef.current.muted;
-    setPlayerState(prev => ({ ...prev, isMuted: !prev.isMuted }));
-  };
-
-  const toggleFullscreen = () => {
-    if (!playerContainerRef.current) return;
+    const video = videoRef.current;
     
-    if (!document.fullscreenElement) {
-      playerContainerRef.current.requestFullscreen().catch(err => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
-      setPlayerState(prev => ({ ...prev, isFullscreen: true }));
-    } else {
-      document.exitFullscreen();
-      setPlayerState(prev => ({ ...prev, isFullscreen: false }));
+    if (video) {
+      video.volume = volume;
+      video.muted = volume === 0;
+      setPlayerState(prev => ({
+        ...prev,
+        volume,
+        isMuted: volume === 0
+      }));
     }
   };
 
+  const toggleMute = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const newMuted = !video.muted;
+    video.muted = newMuted;
+    
+    // If unmuting and volume is 0, set to default
+    if (!newMuted && video.volume === 0) {
+      video.volume = 0.7;
+      setPlayerState(prev => ({ ...prev, volume: 0.7 }));
+    }
+    
+    setPlayerState(prev => ({
+      ...prev,
+      isMuted: newMuted
+    }));
+  };
+
+  const toggleFullscreen = () => {
+    const container = playerContainerRef.current;
+    if (!container) return;
+
+    if (!document.fullscreenElement) {
+      container.requestFullscreen().catch(err => {
+        console.error('Fullscreen error:', err);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  const handlePlaybackRateChange = (rate) => {
+    const video = videoRef.current;
+    if (video) {
+      video.playbackRate = rate;
+      setPlayerState(prev => ({ ...prev, playbackRate: rate }));
+    }
+  };
+
+  const handleMouseMove = () => {
+    setPlayerState(prev => ({ ...prev, showControls: true }));
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+  };
+
+  const scrollToDetails = () => {
+    detailsSectionRef.current?.scrollIntoView({ 
+      behavior: 'smooth' 
+    });
+  };
+
   const formatTime = (seconds) => {
-    if (isNaN(seconds)) return '00:00';
+    if (isNaN(seconds) || seconds === 0) return '00:00';
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
     const secs = Math.floor(seconds % 60);
@@ -229,77 +340,78 @@ function MovieWatch() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleWatchClick = () => {
-    if (!user) {
-      setShowAuthPrompt(true);
-      return;
-    }
-
+  const handleDownload = () => {
     if (!hasAccess) {
-      navigate(`/payment/${id}?type=movie_watch`);
+      if (!user) setShowAuthPrompt(true);
+      else navigate(`/payment/${id}?type=movie_download`);
       return;
     }
     
-    // User has access, start playing
-    if (videoRef.current) {
-      videoRef.current.play();
-      setPlayerState(prev => ({ ...prev, isPlaying: true }));
-      setIsPlaying(true);
-    }
+    // Download logic
+    const link = document.createElement('a');
+    link.href = streamingUrl;
+    link.download = `${movie?.title || 'movie'}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
-  const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/movie/${id}`;
+  const handleShare = () => {
+    const shareUrl = `${window.location.origin}/watch/${id}`;
     const shareText = `Watch "${movie?.title}" on our platform!`;
     
     if (navigator.share) {
-      try {
-        await navigator.share({
-          title: movie?.title,
-          text: shareText,
-          url: shareUrl,
-        });
-      } catch (err) {
-        console.error('Error sharing:', err);
-      }
+      navigator.share({
+        title: movie?.title,
+        text: shareText,
+        url: shareUrl,
+      }).catch(err => {
+        console.error('Share error:', err);
+      });
     } else {
-      // Fallback: copy to clipboard
       navigator.clipboard.writeText(shareUrl).then(() => {
         alert('Link copied to clipboard!');
       }).catch(err => {
-        console.error('Failed to copy:', err);
+        console.error('Copy error:', err);
       });
     }
   };
 
-  const handleMouseMove = () => {
-    setShowPlayerControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
+  const retryPlayer = () => {
+    setPlayerState(prev => ({ ...prev, playerError: null }));
+    const video = videoRef.current;
+    if (video) {
+      video.load();
+      video.play().catch(err => {
+        console.error('Retry failed:', err);
+      });
     }
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-gray-300 mt-4">Loading movie...</p>
+          <Loader className="w-12 h-12 animate-spin text-blue-500 mx-auto" />
+          <p className="text-gray-300 mt-4">Loading cinematic experience...</p>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md p-8">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-white mb-4">Error Loading Movie</h2>
-          <p className="text-gray-300 mb-6">{error}</p>
+          <h2 className="text-2xl font-bold text-white mb-4">
+            {error}
+          </h2>
           <button
             onClick={() => navigate(-1)}
-            className="bg-blue-500 hover:bg-blue-600 text-black px-6 py-3 rounded-lg font-semibold"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold"
           >
             Go Back
           </button>
@@ -315,7 +427,7 @@ function MovieWatch() {
           <h2 className="text-2xl font-bold text-white mb-4">Movie Not Found</h2>
           <button
             onClick={() => navigate(-1)}
-            className="bg-blue-500 hover:bg-blue-600 text-black px-6 py-3 rounded-lg font-semibold"
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold"
           >
             Go Back
           </button>
@@ -325,220 +437,285 @@ function MovieWatch() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Auth Prompt Modal */}
+    <div className="bg-black text-white min-h-screen">
       <AuthPromptModal
         isOpen={showAuthPrompt}
         onClose={() => setShowAuthPrompt(false)}
-        movieTitle={movie?.title}
+        movieTitle={movie.title}
       />
 
-      {/* Video Player Area */}
+      {/* Scroll Arrow */}
+      <button
+        onClick={scrollToDetails}
+        className="fixed bottom-6 right-6 z-30 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-xl transition-all animate-bounce"
+        aria-label="Scroll to details"
+      >
+        <ChevronDown className="w-6 h-6" />
+      </button>
+
+      {/* Player Section - Fixed height */}
       <div 
         ref={playerContainerRef}
-        className="relative w-full h-screen bg-black"
+        className="relative w-full h-[70vh] min-h-[500px] bg-black"
         onMouseMove={handleMouseMove}
-        onMouseLeave={() => {
-          if (isPlaying) {
-            controlsTimeoutRef.current = setTimeout(() => {
-              setShowPlayerControls(false);
-            }, 1000);
-          }
-        }}
       >
         {/* Back Button */}
         <button
           onClick={() => navigate(-1)}
-          className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/60 hover:bg-black/80 px-4 py-2 rounded-lg transition-all"
+          className="absolute top-4 left-4 z-20 bg-black/60 hover:bg-black/80 p-3 rounded-full backdrop-blur-sm transition-all"
         >
           <ArrowLeft className="w-5 h-5" />
-          Back
         </button>
 
+        {/* Access Status Badge */}
+        {user && (
+          <div className="absolute top-4 right-4 z-20">
+            {hasAccess ? (
+              <div className="flex items-center gap-2 bg-green-500/20 border border-green-500/30 text-green-400 px-4 py-2 rounded-lg backdrop-blur-sm">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">Access Granted</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-red-500/20 border border-red-500/30 text-red-400 px-4 py-2 rounded-lg backdrop-blur-sm">
+                <Lock className="w-4 h-4" />
+                <span className="text-sm font-medium">Purchase Required</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Video Player */}
-        <div className="w-full h-full flex items-center justify-center">
-          {videoUrl ? (
-            <div className="relative w-full h-full">
+        <div className="relative w-full h-full flex items-center justify-center">
+          {playerState.playerError ? (
+            <div className="text-center p-8">
+              <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+              <h3 className="text-xl font-bold text-white mb-2">
+                Playback Error
+              </h3>
+              <p className="text-gray-300 mb-6">{playerState.playerError}</p>
+              <button
+                onClick={retryPlayer}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold flex items-center gap-2 mx-auto"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Retry
+              </button>
+            </div>
+          ) : streamingUrl && hasAccess ? (
+            <>
+              {/* Video Element */}
               <video
                 ref={videoRef}
-                src={videoUrl}
                 className="w-full h-full object-contain"
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleTimeUpdate}
-                onEnded={() => setPlayerState(prev => ({ ...prev, isPlaying: false }))}
-                controls={false}
-              />
-              
-              {/* Custom Player Controls */}
-              {(showPlayerControls || !playerState.isPlaying) && (
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 transition-opacity duration-300">
-                  {/* Progress Bar */}
-                  <div className="mb-4">
-                    <input
-                      type="range"
-                      min="0"
-                      max={playerState.duration || 100}
-                      value={playerState.currentTime || 0}
-                      onChange={handleSeek}
-                      className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500"
-                    />
-                    <div className="flex justify-between text-xs text-gray-300 mt-1">
-                      <span>{formatTime(playerState.currentTime)}</span>
-                      <span>{formatTime(playerState.duration)}</span>
-                    </div>
-                  </div>
+                src={streamingUrl}
+                playsInline
+                onClick={handlePlayPause}
+              >
+                <source src={streamingUrl} type="video/mp4" />
+                Your browser does not support the video tag.
+              </video>
 
-                  {/* Control Buttons */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+              {/* Overlay Controls */}
+              {(playerState.showControls || !playerState.isPlaying || playerState.buffering) && (
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent pointer-events-none">
+                  {/* Center Play Button - Shows when paused */}
+                  {!playerState.isPlaying && !playerState.buffering && (
+                    <div className="absolute inset-0 flex items-center justify-center">
                       <button
                         onClick={handlePlayPause}
-                        className="p-2 hover:bg-white/10 rounded-full"
+                        className="bg-blue-600 hover:bg-blue-700 text-white p-6 rounded-full shadow-2xl transform hover:scale-105 transition-all pointer-events-auto"
                       >
-                        {playerState.isPlaying ? (
-                          <Pause className="w-6 h-6" />
-                        ) : (
-                          <Play className="w-6 h-6" />
-                        )}
-                      </button>
-                      
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={toggleMute}
-                          className="p-2 hover:bg-white/10 rounded-full"
-                        >
-                          {playerState.isMuted ? (
-                            <VolumeX className="w-5 h-5" />
-                          ) : (
-                            <Volume2 className="w-5 h-5" />
-                          )}
-                        </button>
-                        <input
-                          type="range"
-                          min="0"
-                          max="1"
-                          step="0.1"
-                          value={playerState.volume}
-                          onChange={handleVolumeChange}
-                          className="w-24 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
-                        />
-                      </div>
-
-                      <div className="text-sm">
-                        {formatTime(playerState.currentTime)} / {formatTime(playerState.duration)}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <button className="p-2 hover:bg-white/10 rounded-full">
-                        <Settings className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={toggleFullscreen}
-                        className="p-2 hover:bg-white/10 rounded-full"
-                      >
-                        <Maximize className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Play Overlay - Shows when video is paused or not started */}
-              {!playerState.isPlaying && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                  {hasAccess ? (
-                    <button
-                      onClick={handlePlayPause}
-                      className="flex items-center gap-3 bg-blue-500 hover:bg-blue-600 text-black px-8 py-4 rounded-full text-lg font-semibold transition-all"
-                    >
-                      <Play className="w-8 h-8" />
-                      Play Movie
-                    </button>
-                  ) : (
-                    <div className="text-center">
-                      <h3 className="text-2xl font-bold mb-4">Access Required</h3>
-                      <p className="text-gray-300 mb-6">Purchase this movie to start watching</p>
-                      <button
-                        onClick={handleWatchClick}
-                        className="bg-blue-500 hover:bg-blue-600 text-black px-8 py-3 rounded-lg font-semibold text-lg"
-                      >
-                        Watch Now - {movie.currency || 'RWF'} {movie.viewPrice}
+                        <Play className="w-12 h-12" />
                       </button>
                     </div>
                   )}
+
+                  {/* Buffering Overlay */}
+                  {playerState.buffering && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="text-center">
+                        <Loader className="w-12 h-12 animate-spin text-blue-500 mx-auto" />
+                        <p className="text-gray-300 mt-2">Buffering...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bottom Controls Bar */}
+                  <div className="absolute bottom-0 left-0 right-0 p-4 space-y-3 pointer-events-auto">
+                    {/* Progress Bar */}
+                    <div className="space-y-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max={playerState.duration || 100}
+                        value={playerState.currentTime}
+                        onChange={handleSeek}
+                        onMouseDown={handleSeekStart}
+                        onMouseUp={handleSeekEnd}
+                        onTouchStart={handleSeekStart}
+                        onTouchEnd={handleSeekEnd}
+                        className="w-full h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white"
+                      />
+                      <div className="flex justify-between text-sm text-gray-300">
+                        <span>{formatTime(playerState.currentTime)}</span>
+                        <span>{formatTime(playerState.duration)}</span>
+                      </div>
+                    </div>
+
+                    {/* Control Buttons */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={handlePlayPause}
+                          className="hover:bg-white/20 p-2 rounded-full transition-colors"
+                          disabled={playerState.buffering}
+                        >
+                          {playerState.buffering ? (
+                            <Loader className="w-5 h-5 animate-spin" />
+                          ) : playerState.isPlaying ? (
+                            <Pause className="w-5 h-5" />
+                          ) : (
+                            <Play className="w-5 h-5" />
+                          )}
+                        </button>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={toggleMute}
+                            className="hover:bg-white/20 p-2 rounded-full transition-colors"
+                          >
+                            {playerState.isMuted ? (
+                              <VolumeX className="w-5 h-5" />
+                            ) : (
+                              <Volume2 className="w-5 h-5" />
+                            )}
+                          </button>
+                          <input
+                            type="range"
+                            min="0"
+                            max="1"
+                            step="0.01"
+                            value={playerState.isMuted ? 0 : playerState.volume}
+                            onChange={handleVolumeChange}
+                            className="w-20 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="text-sm font-medium">
+                          {formatTime(playerState.currentTime)} / {formatTime(playerState.duration)}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => handlePlaybackRateChange(
+                            playerState.playbackRate === 1 ? 1.5 : 1
+                          )}
+                          className="text-sm font-medium hover:bg-white/20 px-3 py-1 rounded transition-colors"
+                        >
+                          {playerState.playbackRate}x
+                        </button>
+                        
+                        <button
+                          onClick={toggleFullscreen}
+                          className="hover:bg-white/20 p-2 rounded-full transition-colors"
+                        >
+                          <Maximize className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           ) : (
-            <div className="text-center">
-              <h3 className="text-2xl font-bold mb-4">Streaming Not Available</h3>
-              <p className="text-gray-300 mb-6">This movie is not available for streaming yet.</p>
-              {movie.viewPrice && !hasAccess && (
+            // No Streaming URL/No Access State
+            <div className="text-center p-8 max-w-lg">
+              <Lock className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-white mb-2">
+                {hasAccess ? 'Video Unavailable' : 'Purchase Required'}
+              </h3>
+              <p className="text-gray-300 mb-6">
+                {hasAccess 
+                  ? 'The streaming link for this movie is currently unavailable.'
+                  : `Purchase access to watch "${movie.title}" in ${movie.videoQuality || 'HD'} quality.`
+                }
+              </p>
+              
+              <div className="space-y-3">
                 <button
-                  onClick={handleWatchClick}
-                  className="bg-blue-500 hover:bg-blue-600 text-black px-8 py-3 rounded-lg font-semibold text-lg"
+                  onClick={() => user 
+                    ? navigate(`/payment/${id}?type=movie_watch`)
+                    : setShowAuthPrompt(true)
+                  }
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg transition-all"
                 >
-                  Purchase to Watch - {movie.currency || 'RWF'} {movie.viewPrice}
+                  {user ? 'Purchase Access' : 'Login to Purchase'}
                 </button>
-              )}
+                <button
+                  onClick={() => navigate(-1)}
+                  className="w-full bg-gray-800 hover:bg-gray-700 text-white py-3 rounded-lg transition-colors"
+                >
+                  Go Back
+                </button>
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Movie Details and Reviews Section */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      {/* Movie Details Section - Scrollable */}
+      <div 
+        ref={detailsSectionRef}
+        className="max-w-7xl mx-auto px-4 py-12"
+      >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Movie Details */}
-            <div className="bg-gray-900 rounded-xl p-8">
-              <div className="flex items-start justify-between mb-6">
+            {/* Movie Info Card */}
+            <div className="bg-gray-900/60 backdrop-blur-sm border border-gray-800 rounded-2xl p-6 md:p-8">
+              <div className="flex flex-col md:flex-row items-start justify-between gap-6 mb-6">
                 <div>
-                  <h1 className="text-3xl font-bold mb-2">{movie.title}</h1>
-                  <div className="flex items-center gap-4 mb-4">
-                    {movie.avgRating && (
+                  <h1 className="text-3xl lg:text-4xl font-bold text-white mb-3">
+                    {movie.title}
+                  </h1>
+                  <div className="flex flex-wrap items-center gap-4 text-gray-300">
+                    {movie.vote_average && (
                       <div className="flex items-center gap-2">
                         <div className="flex items-center">
                           {[...Array(5)].map((_, i) => (
                             <Star
                               key={i}
-                              size={18}
+                              size={16}
                               className={`${
-                                i < Math.floor(movie.avgRating || 0)
+                                i < Math.floor(movie.vote_average / 2)
                                   ? 'fill-yellow-400 text-yellow-400'
                                   : 'text-gray-500'
                               }`}
                             />
                           ))}
                         </div>
-                        <span className="text-gray-300">{movie.avgRating}/5</span>
+                        <span>{movie.vote_average?.toFixed(1)}/10</span>
                       </div>
                     )}
                     
-                    <div className="flex items-center gap-4 text-gray-300">
-                      {movie.videoDuration && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {movie.videoDuration > 3600 
-                            ? `${Math.floor(movie.videoDuration / 3600)}h ${Math.floor((movie.videoDuration % 3600) / 60)}m`
-                            : `${Math.floor(movie.videoDuration / 60)}m`
-                          }
-                        </span>
-                      )}
-                      {movie.release_date && (
-                        <span>{movie.release_date.split('-')[0]}</span>
-                      )}
-                      {movie.adult && (
-                        <span className="bg-red-500/80 text-white text-xs px-2 py-0.5 rounded">18+</span>
-                      )}
-                    </div>
+                    {movie.videoDuration && (
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-4 h-4" />
+                        {formatTime(movie.videoDuration)}
+                      </span>
+                    )}
+                    
+                    {movie.release_date && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-4 h-4" />
+                        {new Date(movie.release_date).getFullYear()}
+                      </span>
+                    )}
                   </div>
                 </div>
                 
-                {/* Action Buttons */}
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   <button
                     onClick={handleShare}
                     className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 px-4 py-2 rounded-lg transition-colors"
@@ -547,144 +724,175 @@ function MovieWatch() {
                     Share
                   </button>
                   
-                  {!hasAccess && movie.viewPrice && (
+                  {hasAccess && streamingUrl && (
                     <button
-                      onClick={handleWatchClick}
-                      className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold"
+                      onClick={handleDownload}
+                      className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors"
                     >
-                      Watch Now - {movie.currency || 'RWF'} {movie.viewPrice}
+                      <Download className="w-5 h-5" />
+                      Download
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Genres */}
-              <div className="flex flex-wrap gap-2 mb-6">
-                {(movie.genres || movie.categories || []).map((genre, idx) => (
-                  <span
-                    key={genre.id || idx}
-                    className="bg-gray-800 text-gray-300 px-3 py-1 rounded-full text-sm"
-                  >
-                    {genre.name || genre}
-                  </span>
-                ))}
-              </div>
+              {/* Genres/Tags */}
+              {movie.categories && movie.categories.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {movie.categories.map((category, idx) => (
+                    <span
+                      key={idx}
+                      className="bg-blue-500/20 text-blue-400 px-3 py-1.5 rounded-full text-sm font-medium"
+                    >
+                      {category}
+                    </span>
+                  ))}
+                </div>
+              )}
 
-              {/* Overview */}
-              <div className="mb-6">
-                <h3 className="text-xl font-semibold mb-3">Overview</h3>
-                <p className="text-gray-300 leading-relaxed">
-                  {movie.overview || "No description available."}
+              {/* Description */}
+              <div className="mb-8">
+                <h3 className="text-xl font-semibold text-white mb-3">Synopsis</h3>
+                <p className="text-gray-300 leading-relaxed whitespace-pre-line">
+                  {movie.description || 'No description available.'}
                 </p>
               </div>
 
-              {/* Additional Info */}
+              {/* Stats Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-6 border-t border-gray-800">
-                {movie.director && (
-                  <div>
-                    <p className="text-gray-400 text-sm">Director</p>
-                    <p className="font-semibold">{movie.director}</p>
-                  </div>
-                )}
                 {movie.language && (
                   <div>
-                    <p className="text-gray-400 text-sm">Language</p>
-                    <p className="font-semibold">{movie.language}</p>
+                    <p className="text-gray-400 text-sm flex items-center gap-1">
+                      <Globe className="w-4 h-4" />
+                      Language
+                    </p>
+                    <p className="text-white font-semibold text-lg">
+                      {movie.language.toUpperCase()}
+                    </p>
                   </div>
                 )}
-                {movie.views !== undefined && (
+                
+                {movie.totalViews !== undefined && (
                   <div>
-                    <p className="text-gray-400 text-sm">Views</p>
-                    <p className="font-semibold">{movie.views?.toLocaleString() || '0'}</p>
+                    <p className="text-gray-400 text-sm flex items-center gap-1">
+                      <Users className="w-4 h-4" />
+                      Views
+                    </p>
+                    <p className="text-white font-semibold text-lg">
+                      {movie.totalViews?.toLocaleString() || '0'}
+                    </p>
                   </div>
                 )}
-                {movie.filmmaker && (
+                
+                {movie.videoQuality && (
                   <div>
-                    <p className="text-gray-400 text-sm">Filmmaker</p>
-                    <p className="font-semibold">{movie.filmmaker.name}</p>
+                    <p className="text-gray-400 text-sm">Quality</p>
+                    <p className="text-white font-semibold text-lg">{movie.videoQuality}</p>
                   </div>
                 )}
+                
+                <div>
+                  <p className="text-gray-400 text-sm">Status</p>
+                  <p className="text-white font-semibold text-lg">
+                    {hasAccess ? 'Available' : 'Locked'}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Review Form */}
-            {user && hasAccess && <ReviewForm movieId={id} />}
-
-            {/* Reviews List */}
-            <ReviewList movieId={id} />
+            {/* Reviews Section */}
+            <div className="space-y-8">
+              {hasAccess && user && <ReviewForm movieId={id} />}
+              <ReviewList movieId={id} />
+            </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Quick Info Card */}
-            <div className="bg-gray-900 rounded-xl p-6 sticky top-6">
-              <h3 className="text-lg font-semibold mb-4">Movie Info</h3>
+            {/* Access Info Card */}
+            <div className="bg-gray-900/60 backdrop-blur-sm border border-gray-800 rounded-2xl p-6 sticky top-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Access Information
+              </h3>
+              
               <div className="space-y-4">
                 <div>
-                  <p className="text-gray-400 text-sm">Status</p>
+                  <p className="text-gray-400 text-sm">Your Status</p>
                   <p className={`text-lg font-semibold ${hasAccess ? 'text-green-500' : 'text-yellow-500'}`}>
-                    {hasAccess ? 'Purchased' : 'Available for Purchase'}
+                    {hasAccess ? 'Access Granted' : 'Access Required'}
                   </p>
                 </div>
                 
-                {movie.viewPrice && (
+                {!hasAccess && movie.viewPrice && (
                   <div>
-                    <p className="text-gray-400 text-sm">Price</p>
+                    <p className="text-gray-400 text-sm">Watch Price</p>
                     <p className="text-2xl font-bold text-blue-400">
                       {movie.currency || 'RWF'} {movie.viewPrice}
                     </p>
                   </div>
                 )}
                 
-                <div>
-                  <p className="text-gray-400 text-sm">Quality</p>
-                  <p className="text-white font-semibold">HD • 1080p</p>
-                </div>
+                {movie.videoQuality && (
+                  <div>
+                    <p className="text-gray-400 text-sm">Quality</p>
+                    <p className="text-white font-semibold">{movie.videoQuality}</p>
+                  </div>
+                )}
                 
                 {movie.videoDuration && (
                   <div>
                     <p className="text-gray-400 text-sm">Duration</p>
                     <p className="text-white font-semibold">
-                      {movie.videoDuration > 3600 
-                        ? `${Math.floor(movie.videoDuration / 3600)}h ${Math.floor((movie.videoDuration % 3600) / 60)}m`
-                        : `${Math.floor(movie.videoDuration / 60)}m`
-                      }
+                      {formatTime(movie.videoDuration)}
                     </p>
                   </div>
                 )}
               </div>
               
               {!hasAccess && (
-                <button
-                  onClick={handleWatchClick}
-                  className="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-black font-semibold py-3 rounded-lg transition-colors"
-                >
-                  {user ? 'Purchase Now' : 'Login to Purchase'}
-                </button>
+                <div className="mt-6 space-y-3">
+                  <button
+                    onClick={() => user 
+                      ? navigate(`/payment/${id}?type=movie_watch`)
+                      : setShowAuthPrompt(true)
+                    }
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 rounded-lg transition-all"
+                  >
+                    {user ? 'Purchase Stream Access' : 'Login to Purchase'}
+                  </button>
+                </div>
               )}
             </div>
 
-            {/* Filmmaker Info */}
-            {movie.filmmaker && (
-              <div className="bg-gray-900 rounded-xl p-6">
-                <h3 className="text-lg font-semibold mb-4">Filmmaker</h3>
-                <div className="flex items-start gap-4">
-                  {movie.filmmaker.avatar && (
-                    <img
-                      src={movie.filmmaker.avatar}
-                      alt={movie.filmmaker.name}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
-                  )}
-                  <div>
-                    <h4 className="font-semibold text-white">{movie.filmmaker.name}</h4>
-                    {movie.filmmaker.bio && (
-                      <p className="text-gray-300 text-sm mt-2">{movie.filmmaker.bio}</p>
-                    )}
-                  </div>
+            {/* Stats Card */}
+            <div className="bg-gray-900/60 backdrop-blur-sm border border-gray-800 rounded-2xl p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">
+                Movie Stats
+              </h3>
+              
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Total Views</span>
+                  <span className="font-semibold">
+                    {movie.totalViews?.toLocaleString() || '0'}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Rating</span>
+                  <span className="font-semibold">
+                    {movie.vote_average?.toFixed(1) || 'N/A'}/10
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Reviews</span>
+                  <span className="font-semibold">
+                    {movie.totalReviews || movie.vote_count || '0'}
+                  </span>
                 </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

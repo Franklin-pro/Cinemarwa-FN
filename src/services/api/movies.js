@@ -47,7 +47,7 @@ export const moviesService = {
   // Reviews
   getMovieReviews: (movieId) => moviesAxios.get(`/${movieId}/reviews`),
   addReview: (movieId, reviewData) =>
-    moviesAxios.post(`/${movieId}/reviews`, reviewData),
+    moviesAxios.post(`/${movieId}/add-review`, reviewData),
   updateReview: (movieId, reviewId, reviewData) =>
     moviesAxios.put(`/${movieId}/reviews/${reviewId}`, reviewData),
   deleteReview: (movieId, reviewId) =>

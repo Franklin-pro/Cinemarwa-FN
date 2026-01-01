@@ -89,6 +89,7 @@ function UploadMovie() {
     release_date: '',
     language: 'en',
     original_language: 'en',
+    youtubeTrailerLink: '',
     
     // Content Type
     contentType: 'movie',
@@ -316,6 +317,15 @@ function UploadMovie() {
       newErrors.description = 'Description must be at least 20 characters';
     }
 
+    // YouTube trailer link validation (optional)
+    if (formData.youtubeTrailerLink && formData.youtubeTrailerLink.trim()) {
+      const yt = formData.youtubeTrailerLink.trim();
+      const ytRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+(&.*)?$/;
+      if (!ytRegex.test(yt)) {
+        newErrors.youtubeTrailerLink = 'Please enter a valid YouTube link';
+      }
+    }
+
     // Series validation for episodes
     if (formData.contentType === 'episode') {
       if (!formData.seriesId) {
@@ -429,6 +439,7 @@ function UploadMovie() {
       formDataToSend.append('videoQuality', formData.videoQuality);
       formDataToSend.append('videoDuration', formData.videoDuration);
       formDataToSend.append('ageRestriction', formData.ageRestriction);
+      formDataToSend.append('youtubeTrailerLink', formData.youtubeTrailerLink);
 
       // Handle content type specific fields
       if (isMovie) {
@@ -517,6 +528,7 @@ function UploadMovie() {
       totalSeasons: 1,
       categories: [],
       tags: '',
+      youtubeTrailerLink: '',
       ageRestriction: 0,
       viewPrice: 100, // Changed from 0 to 100
       downloadPrice: 0,
@@ -938,6 +950,29 @@ function UploadMovie() {
           className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
         />
         <p className="text-gray-400 text-xs mt-1">Helps users discover your content</p>
+      </div>
+
+      {/* YouTube Trailer Link (Optional) */}
+      <div>
+        <label className="block text-sm font-medium mb-2">
+          <Video className="w-4 h-4 inline mr-2" />
+          YouTube Trailer (optional)
+        </label>
+        <input
+          type="url"
+          name="youtubeTrailerLink"
+          value={formData.youtubeTrailerLink}
+          onChange={handleInputChange}
+          placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
+          className={`w-full px-4 py-3 bg-gray-800/50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${errors.youtubeTrailerLink ? 'border-red-500' : 'border-gray-700'}`}
+        />
+        {errors.youtubeTrailerLink && (
+          <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.youtubeTrailerLink}
+          </p>
+        )}
+        <p className="text-gray-400 text-xs mt-1">Paste a YouTube link to show a trailer on your content page</p>
       </div>
 
       {/* Age Restriction */}
@@ -1527,6 +1562,11 @@ function UploadMovie() {
             <div className="flex justify-between">
               <span className="text-gray-400">Title:</span>
               <span className="font-medium">{formData.title || 'Not set'}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span className="text-gray-400">Trailer:</span>
+              <span className="font-medium">{formData.youtubeTrailerLink ? '✓ Set' : '✗ Missing'}</span>
             </div>
             
             {!isEpisode && (
