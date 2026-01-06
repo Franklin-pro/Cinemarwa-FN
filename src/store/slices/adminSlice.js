@@ -38,6 +38,18 @@ export const recentlyActivities = createAsyncThunk(
     }
   }
 );
+ 
+export const fetchSystemHealth = createAsyncThunk(
+  'admin/fetchSystemHealth',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await adminAPI.fetchHealthSystem();
+      return data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch system health');
+    }
+  }
+);
 
 export const fetchAnalytics = createAsyncThunk(
   'admin/fetchAnalytics',
@@ -302,6 +314,22 @@ const adminSlice = createSlice({
         state.activities = action.payload; // FIXED: Store in activities, not filmmakersPerformance
       })
       .addCase(recentlyActivities.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
+
+      // system health
+    builder
+      .addCase(fetchSystemHealth.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchSystemHealth.fulfilled, (state, action) => {
+        state.loading = false;
+        state.systemHealth = action.payload;
+      }
+      )
+      .addCase(fetchSystemHealth.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

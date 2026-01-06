@@ -107,7 +107,7 @@ function UploadMovie() {
     // Pricing - DEFAULT VIEW PRICE SET TO 100
     viewPrice: 100,
     downloadPrice: 0,
-    currency: 'USD',
+    currency: 'RWF',
     royaltyPercentage: 70,
     allowDownload: true,
     downloadExpiry: 30,
@@ -532,7 +532,7 @@ function UploadMovie() {
       ageRestriction: 0,
       viewPrice: 100, // Changed from 0 to 100
       downloadPrice: 0,
-      currency: 'USD',
+      currency: 'RWF',
       royaltyPercentage: 70,
       allowDownload: true,
       downloadExpiry: 30,

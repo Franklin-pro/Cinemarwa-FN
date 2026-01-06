@@ -63,15 +63,15 @@ const Navbar = () => {
   const navItems = isLoggedIn
     ? [
         { id: "home", label: "Home" },
-        { id: "trending", label: "Trending" },
-        { id: "featured", label: "Featured" },
-        { id: "all-movies", label: "All Movies" }
+        { id: "movies", label: "All Movies" },
+        { id: "single-movie", label: "Single Movie" },
+        { id: "series", label: "Series Movie" }
       ]
     : [
-        { id: "home", label: "Home",path:"/" },
-        // { id: "topRated", label: "Top Rated" },
-        { id: "trending", label: "Trending" },
-        { id: "popular", label: "Popular" }
+        { id: "home", label: "Home" },
+        { id: "movies", label: "All Movies" },
+        { id: "single-movie", label: "Single Movie" },
+        { id: "series", label: "Series Movie" }
       ];
 
   // Smooth scroll to section

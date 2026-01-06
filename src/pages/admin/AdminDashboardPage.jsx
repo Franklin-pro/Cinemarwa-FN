@@ -5,10 +5,17 @@ import {
   fetchAnalytics,
   filmmakerPerformance,
   recentlyActivities,
+  fetchSystemHealth,
   clearError,
   clearSuccessMessage,
 } from '../../store/slices/adminSlice';
-import { BarChart, Users, Film, AlertCircle, TrendingUp, Mail, Clock, Activity, TrendingUp as PerformanceIcon, Menu, X } from 'lucide-react';
+import { 
+  BarChart, Users, Film, AlertCircle, TrendingUp, Mail, Clock, Activity, 
+  TrendingUp as PerformanceIcon, Menu, X, Heart, Server, Cpu, Database, 
+  Shield, Globe, Cloud, Zap, AlertTriangle, CheckCircle, XCircle, 
+  RefreshCw, Download, Wifi, WifiOff, HardDrive, MemoryStick, Thermometer,
+  Activity as CpuActivity
+} from 'lucide-react';
 
 // Admin Dashboard Tabs
 import FilmmakerManagement from '../../components/admin/FilmmakerManagement';
@@ -36,6 +43,7 @@ function AdminDashboardPage() {
     analytics, 
     filmmakersPerformance,
     activities,
+    systemHealth,
     loading, 
     error, 
     successMessage 
@@ -46,6 +54,7 @@ function AdminDashboardPage() {
   const [performancePeriod, setPerformancePeriod] = useState('month');
   const [activitiesPeriod, setActivitiesPeriod] = useState('week');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [healthRefreshInterval, setHealthRefreshInterval] = useState(30); // seconds
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -61,8 +70,23 @@ function AdminDashboardPage() {
       dispatch(recentlyActivities(activitiesPeriod));
     } else if (activeTab === 'performance') {
       dispatch(filmmakerPerformance(performancePeriod));
+    } else if (activeTab === 'health') {
+      dispatch(fetchSystemHealth());
     }
   }, [dispatch, activeTab, analyticsPeriod, activitiesPeriod, performancePeriod]);
+
+  // Auto-refresh for system health
+  useEffect(() => {
+    let interval;
+    if (activeTab === 'health' && healthRefreshInterval > 0) {
+      interval = setInterval(() => {
+        dispatch(fetchSystemHealth());
+      }, healthRefreshInterval * 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [dispatch, activeTab, healthRefreshInterval]);
 
   useEffect(() => {
     if (error) {
@@ -94,6 +118,7 @@ function AdminDashboardPage() {
     { id: 'overview', label: 'Overview', icon: BarChart },
     { id: 'activities', label: 'Activities', icon: Activity },
     { id: 'performance', label: 'Performance', icon: PerformanceIcon },
+    { id: 'health', label: 'System Health', icon: Heart },
     { id: 'filmmakers', label: 'Filmmakers', icon: Film },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'subscribers', label: 'Subscribers', icon: Mail },
@@ -254,6 +279,15 @@ function AdminDashboardPage() {
               loading={loading}
             />
           )}
+          {activeTab === 'health' && (
+            <SystemHealthTab
+              systemHealth={systemHealth}
+              loading={loading}
+              refreshInterval={healthRefreshInterval}
+              setRefreshInterval={setHealthRefreshInterval}
+              onRefresh={() => dispatch(fetchSystemHealth())}
+            />
+          )}
           {activeTab === 'filmmakers' && <FilmmakerManagement />}
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'subscribers' && <SubscriberManagement />}
@@ -261,6 +295,498 @@ function AdminDashboardPage() {
           {activeTab === 'payments' && <PaymentReconciliation />}
         </div>
       </div>
+    </div>
+  );
+}
+
+// =============== SYSTEM HEALTH TAB ===============
+function SystemHealthTab({ 
+  systemHealth, 
+  loading, 
+  refreshInterval, 
+  setRefreshInterval,
+  onRefresh 
+}) {
+  const getStatusColor = (status) => {
+    if (!status) return 'bg-gray-500/20 text-gray-400';
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'healthy':
+        return 'bg-green-500/20 text-green-400';
+      case 'warning':
+        return 'bg-yellow-500/20 text-yellow-400';
+      case 'not_configured':
+        return 'bg-gray-500/20 text-gray-400';
+      default:
+        return 'bg-gray-500/20 text-gray-400';
+    }
+  };
+
+  const getStatusIcon = (status) => {
+    if (!status) return <Activity className="w-5 h-5" />;
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'healthy':
+        return <CheckCircle className="w-5 h-5" />;
+      case 'warning':
+        return <AlertTriangle className="w-5 h-5" />;
+      case 'not_configured':
+        return <Activity className="w-5 h-5" />;
+      default:
+        return <Activity className="w-5 h-5" />;
+    }
+  };
+
+  const formatBytes = (bytesString) => {
+    if (!bytesString) return '0 Bytes';
+    try {
+      const bytes = typeof bytesString === 'string' 
+        ? parseFloat(bytesString) 
+        : bytesString;
+      
+      if (bytes === 0) return '0 Bytes';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    } catch (e) {
+      console.error('Error formatting bytes:', e);
+      return bytesString;
+    }
+  };
+
+  const formatUptime = (seconds) => {
+    if (!seconds) return '0s';
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    if (minutes > 0) return `${minutes}m ${secs}s`;
+    return `${secs}s`;
+  };
+
+  if (loading && !systemHealth) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  const healthData = systemHealth || {};
+  const checks = healthData.checks || {};
+  const systemInfo = healthData.system || {};
+  const memory = systemInfo.memory || {};
+  const cpu = systemInfo.cpu || {};
+  const disk = systemInfo.disk || {};
+  const environment = systemInfo.environment || {};
+  const performance = healthData.performance || {};
+  
+  // Calculate overall status
+  const overallStatus = healthData.status || (() => {
+    if (memory.status === 'warning') return 'warning';
+    return 'healthy';
+  })();
+
+  // Get database info
+  const databaseInfo = checks.database || {};
+  
+  // Get external services info
+  const externalServices = checks.externalServices || {};
+
+  return (
+    <div className="space-y-6 md:space-y-8">
+      {/* System Health Header */}
+      <div className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 border border-gray-700 rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-3">
+            <Heart className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-blue-400" />
+            <div>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold">System Health Monitor</h2>
+              <p className="text-xs sm:text-sm text-gray-400 mt-1">
+                Last updated: {new Date(healthData.timestamp || Date.now()).toLocaleString()}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            {/* Refresh Interval Control */}
+            <div className="flex items-center gap-2 bg-gray-800/50 px-3 py-2 rounded-lg">
+              <RefreshCw className="w-4 h-4 text-gray-400" />
+              <select
+                value={refreshInterval}
+                onChange={(e) => setRefreshInterval(Number(e.target.value))}
+                className="bg-transparent text-white text-sm focus:outline-none"
+              >
+                <option value="0">Manual</option>
+                <option value="10">10s</option>
+                <option value="30">30s</option>
+                <option value="60">1m</option>
+                <option value="300">5m</option>
+              </select>
+            </div>
+            
+            {/* Refresh Button */}
+            <button
+              onClick={onRefresh}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        {/* Overall Status Banner */}
+        <div className={`p-4 rounded-lg mb-6 ${getStatusColor(overallStatus)}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {getStatusIcon(overallStatus)}
+              <div>
+                <h3 className="text-lg font-semibold">System Status: {overallStatus.toUpperCase()}</h3>
+                <p className="text-sm opacity-80">
+                  {overallStatus === 'healthy' 
+                    ? 'All systems operating normally' 
+                    : overallStatus === 'warning'
+                    ? 'Some services experiencing issues'
+                    : 'Checking system status...'}
+                </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-2xl sm:text-3xl font-bold">
+                {healthData.success ? '✓' : '✗'}
+              </p>
+              <p className="text-xs opacity-70">API Status</p>
+            </div>
+          </div>
+        </div>
+
+        {/* System Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <MetricCard
+            title="System Uptime"
+            value={formatUptime(systemInfo.uptime?.systemSeconds)}
+            icon={<Server className="w-5 h-5" />}
+            status="healthy"
+            subtext={`Process: ${formatUptime(systemInfo.uptime?.processSeconds)}`}
+          />
+          <MetricCard
+            title="CPU Usage"
+            value={`${cpu.loadAverage?.['15min'] || 0}%`}
+            icon={<Cpu className="w-5 h-5" />}
+            status={cpu.status || 'healthy'}
+            subtext={`${cpu.cores || 0} cores | ${cpu.model || 'Unknown'}`}
+          />
+          <MetricCard
+            title="Memory"
+            value={`${Math.round(parseFloat(memory.system?.used) || 0)}%`}
+            icon={<MemoryStick className="w-5 h-5" />}
+            status={memory.status || 'healthy'}
+            subtext={`Free: ${formatBytes(memory.system?.free)}`}
+          />
+          <MetricCard
+            title="Response Time"
+            value={`${performance.responseTime || 0}ms`}
+            icon={<Zap className="w-5 h-5" />}
+            status={performance.responseTime < 100 ? 'healthy' : 'warning'}
+            subtext="API latency"
+          />
+        </div>
+
+        {/* Environment Info */}
+        <div className="bg-gray-700/20 p-4 rounded-lg mb-6">
+          <h3 className="text-sm font-semibold mb-2 text-gray-300">Environment Details</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <p className="text-xs text-gray-400">Node Version</p>
+              <p className="text-sm font-medium">{environment.nodeVersion}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Platform</p>
+              <p className="text-sm font-medium">{environment.platform}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Architecture</p>
+              <p className="text-sm font-medium">{environment.arch}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Environment</p>
+              <p className="text-sm font-medium">{environment.env}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Services Status Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Database Status */}
+        <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <Database className="w-5 h-5 text-blue-400" />
+              Database Status
+            </h3>
+            <span className={`px-2 py-1 rounded text-xs ${getStatusColor(databaseInfo.status)}`}>
+              {databaseInfo.status?.toUpperCase() || 'UNKNOWN'}
+            </span>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-gray-700/20 p-4 rounded-lg">
+                <p className="text-sm text-gray-400 mb-1">Response Time</p>
+                <p className="text-2xl font-bold">{databaseInfo.responseTime || '0ms'}</p>
+              </div>
+              <div className="bg-gray-700/20 p-4 rounded-lg">
+                <p className="text-sm text-gray-400 mb-1">Dialect</p>
+                <p className="text-2xl font-bold">{databaseInfo.dialect || 'N/A'}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gray-700/10 rounded-lg">
+                <span className="text-sm">Connection Status</span>
+                <span className={`px-2 py-1 rounded text-xs ${databaseInfo.connected ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                  {databaseInfo.connected ? 'CONNECTED' : 'DISCONNECTED'}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-700/10 p-3 rounded-lg text-center">
+                  <p className="text-xs text-gray-400 mb-1">Max Pool</p>
+                  <p className="text-sm font-semibold">{databaseInfo.pool?.max || 0}</p>
+                </div>
+                <div className="bg-gray-700/10 p-3 rounded-lg text-center">
+                  <p className="text-xs text-gray-400 mb-1">Idle Timeout</p>
+                  <p className="text-sm font-semibold">{databaseInfo.pool?.idle ? `${databaseInfo.pool.idle}ms` : 'N/A'}</p>
+                </div>
+                <div className="bg-gray-700/10 p-3 rounded-lg text-center">
+                  <p className="text-xs text-gray-400 mb-1">Acquire Timeout</p>
+                  <p className="text-sm font-semibold">{databaseInfo.pool?.acquire ? `${databaseInfo.pool.acquire}ms` : 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* External Services Status */}
+        <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+              <Globe className="w-5 h-5 text-blue-400" />
+              External Services
+            </h3>
+            <span className={`px-2 py-1 rounded text-xs ${getStatusColor(externalServices.status)}`}>
+              {externalServices.status?.toUpperCase() || 'NOT_CONFIGURED'}
+            </span>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="bg-gray-700/20 p-4 rounded-lg">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-blue-500/20 rounded-full">
+                  <Cloud className="w-5 h-5 text-blue-400" />
+                </div>
+                <div>
+                  <p className="font-medium">Service Status</p>
+                  <p className="text-2xl font-bold">{externalServices.status || 'Not Configured'}</p>
+                </div>
+              </div>
+              <p className="text-sm text-gray-400">
+                {externalServices.message || 'Add external service checks as needed'}
+              </p>
+            </div>
+            
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-yellow-300">Configuration Required</p>
+                  <p className="text-xs text-yellow-400/80 mt-1">
+                    External service monitoring is not configured. Consider adding checks for:
+                  </p>
+                  <ul className="text-xs text-yellow-400/60 mt-2 space-y-1">
+                    <li className="flex items-center gap-1">• Payment gateways (Stripe, PayPal)</li>
+                    <li className="flex items-center gap-1">• Email services (SendGrid, Mailgun)</li>
+                    <li className="flex items-center gap-1">• Storage services (AWS S3, Cloudinary)</li>
+                    <li className="flex items-center gap-1">• CDN services</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Detailed System Metrics */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Memory Details */}
+        <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
+            <MemoryStick className="w-5 h-5 text-blue-400" />
+            Memory Details
+          </h3>
+          
+          <div className="space-y-4">
+            {/* System Memory */}
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-300">System Memory Usage</span>
+                <span className="font-medium">{memory.system?.used || '0'} of {memory.system?.total || '0'}</span>
+              </div>
+              <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+                <div 
+                  className={`h-full ${memory.status === 'warning' ? 'bg-yellow-500' : 'bg-green-500'}`}
+                  style={{ 
+                    width: `${Math.min(parseFloat(memory.system?.usedPercent?.replace('%', '') || 0), 100)}%` 
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>Used: {formatBytes(memory.system?.used)}</span>
+                <span>Free: {formatBytes(memory.system?.free)}</span>
+                <span>Total: {formatBytes(memory.system?.total)}</span>
+              </div>
+            </div>
+
+            {/* Process Memory */}
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-700">
+              <div className="bg-gray-700/20 p-3 rounded-lg">
+                <p className="text-xs text-gray-400 mb-1">Heap Used</p>
+                <p className="text-lg font-bold">{formatBytes(memory.process?.heapUsed)}</p>
+              </div>
+              <div className="bg-gray-700/20 p-3 rounded-lg">
+                <p className="text-xs text-gray-400 mb-1">RSS</p>
+                <p className="text-lg font-bold">{formatBytes(memory.process?.rss)}</p>
+              </div>
+              <div className="bg-gray-700/20 p-3 rounded-lg">
+                <p className="text-xs text-gray-400 mb-1">Heap Total</p>
+                <p className="text-lg font-bold">{formatBytes(memory.process?.heapTotal)}</p>
+              </div>
+              <div className="bg-gray-700/20 p-3 rounded-lg">
+                <p className="text-xs text-gray-400 mb-1">External</p>
+                <p className="text-lg font-bold">{formatBytes(memory.process?.external)}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* CPU & Disk Details */}
+        <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-blue-400" />
+            CPU & Disk Details
+          </h3>
+          
+          <div className="space-y-6">
+            {/* CPU Load Averages */}
+            <div>
+              <p className="text-sm font-medium mb-3">CPU Load Average</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gray-700/20 p-3 rounded-lg text-center">
+                  <p className="text-xs text-gray-400 mb-1">1 min</p>
+                  <p className="text-xl font-bold">{cpu.loadAverage?.['1min'] || '0.00'}</p>
+                </div>
+                <div className="bg-gray-700/20 p-3 rounded-lg text-center">
+                  <p className="text-xs text-gray-400 mb-1">5 min</p>
+                  <p className="text-xl font-bold">{cpu.loadAverage?.['5min'] || '0.00'}</p>
+                </div>
+                <div className="bg-gray-700/20 p-3 rounded-lg text-center">
+                  <p className="text-xs text-gray-400 mb-1">15 min</p>
+                  <p className="text-xl font-bold">{cpu.loadAverage?.['15min'] || '0.00'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Disk Info */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">Disk Status</p>
+                <span className={`px-2 py-1 rounded text-xs ${getStatusColor(disk.status)}`}>
+                  {disk.status?.toUpperCase() || 'UNKNOWN'}
+                </span>
+              </div>
+              
+              <div className="bg-gray-700/20 p-3 rounded-lg">
+                <div className="flex items-center gap-3 mb-2">
+                  <HardDrive className="w-4 h-4 text-gray-400" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Home Directory</p>
+                    <p className="text-xs text-gray-400 truncate">{disk.homeDir || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Process Info */}
+            <div className="pt-4 border-t border-gray-700">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Process ID</p>
+                  <p className="text-sm font-medium font-mono">{environment.pid || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-1">Process Uptime</p>
+                  <p className="text-sm font-medium">{systemInfo.uptime?.process || '0s'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recommendations */}
+      {memory.status === 'warning' && (
+        <div className="bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-lg p-4 sm:p-6">
+          <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-yellow-400" />
+            Recommendations
+          </h3>
+          
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-yellow-500/20 rounded-full mt-1">
+                <MemoryStick className="w-4 h-4 text-yellow-400" />
+              </div>
+              <div>
+                <p className="font-medium">High Memory Usage Detected</p>
+                <p className="text-sm text-gray-300">
+                  System memory usage is at {memory.system?.usedPercent || '0%'}. Consider:
+                </p>
+                <ul className="text-sm text-gray-300 mt-2 space-y-1 ml-4">
+                  <li>• Optimizing application memory usage</li>
+                  <li>• Scaling up server resources</li>
+                  <li>• Reviewing memory leaks in application code</li>
+                  <li>• Implementing caching strategies</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// =============== HEALTH METRIC CARD ===============
+function MetricCard({ title, value, icon, status, subtext }) {
+  return (
+    <div className="bg-gray-700/20 border border-gray-600 rounded-lg p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="p-2 bg-gray-600/30 rounded-lg">
+          {icon}
+        </div>
+        <span className={`px-2 py-1 rounded text-xs ${status === 'healthy' ? 'bg-green-500/20 text-green-400' : status === 'warning' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-gray-500/20 text-gray-400'}`}>
+          {status?.toUpperCase() || 'UNKNOWN'}
+        </span>
+      </div>
+      <p className="text-2xl sm:text-3xl font-bold mb-1 truncate">{value}</p>
+      <p className="text-sm text-gray-400 truncate">{title}</p>
+      {subtext && <p className="text-xs text-gray-500 mt-1 truncate">{subtext}</p>}
     </div>
   );
 }
@@ -885,53 +1411,29 @@ function PerformanceTab({
             {filmmakersPerformance.performanceData.length > 3 && (
               <div className="text-center pt-4">
                 <button className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-all text-sm sm:text-base">
-                  Load More Filmmakers ({filmmakersPerformance.performanceData.length - 3} more)
-                </button>
-              </div>
-            )}
-          </div>
-        ) : filmmakersPerformance ? (
-          <div className="text-center py-8 sm:py-16 text-gray-400">
-            <PerformanceIcon className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-4 sm:mb-6 opacity-30" />
-            <p className="text-base sm:text-xl">No performance data available</p>
-            <p className="text-sm mt-2">Try selecting a different time period</p>
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-8 h-8 sm:w-12 sm:h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <p className="text-gray-400 mt-4 sm:mt-6 text-sm sm:text-lg">Loading performance data...</p>
+              Load More Filmmakers ({filmmakersPerformance.performanceData.length - 3} more)
+            </button>
           </div>
         )}
+      </div>
+    ) : filmmakersPerformance ? (
+      <div className="text-center py-8 sm:py-16 text-gray-400">
+        <PerformanceIcon className="w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 mx-auto mb-4 sm:mb-6 opacity-30" />
+        <p className="text-base sm:text-xl">No performance data available</p>
+        <p className="text-sm mt-2">Try selecting a different time period</p>
+      </div>
+    ) : (
+      <div className="text-center py-12">
+        <div className="w-8 h-8 sm:w-12 sm:h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        <p className="text-gray-400 mt-4 sm:mt-6 text-sm sm:text-lg">Loading performance data...</p>
+      </div>
+    )}
       </div>
     </div>
   );
 }
 
 // =============== SHARED COMPONENTS ===============
-
-function MetricCard({ title, value, change, icon }) {
-  const isPositive = change >= 0;
-  const hasChange = change !== undefined && change !== null;
-
-  return (
-    <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 sm:p-4 md:p-6 hover:border-blue-600/30 transition-all">
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm text-gray-400 mb-1 sm:mb-2 truncate">{title}</p>
-          <p className="text-xl sm:text-2xl md:text-3xl font-bold truncate">{value}</p>
-          {hasChange && (
-            <p className={`text-xs sm:text-sm mt-1 sm:mt-2 flex items-center gap-1 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
-              <span>{isPositive ? '↑' : '↓'}</span>
-              {Math.abs(change)}% from last period
-            </p>
-          )}
-        </div>
-        <div className="text-2xl sm:text-3xl md:text-4xl opacity-60 ml-2 flex-shrink-0">{icon}</div>
-      </div>
-    </div>
-  );
-}
-
 function StatsBox({ label, value, subtext }) {
   return (
     <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 sm:p-4 md:p-6">

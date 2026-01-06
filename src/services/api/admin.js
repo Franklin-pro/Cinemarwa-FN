@@ -91,6 +91,10 @@ export const approveMovie = async (movieId, data) => {
   const response = await adminAPI.patch(`/movies/${movieId}/approve`, data);
   return response.data;
 };
+export const fetchHealthSystem = async () => {
+  const response = await adminAPI.get('/system/health');
+  return response.data;
+}
 
 export const getFlaggedContent = async (type = 'all') => {
   const response = await adminAPI.get(`/flagged-content?type=${type}`);
