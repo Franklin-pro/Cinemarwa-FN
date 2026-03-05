@@ -38,10 +38,13 @@ export default function Payment() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user } = useSelector((s) => s.auth || {});
-  const { currentTransaction, paymentStatus, gatewayStatus, withdrawalsProcessed } = useSelector((s) => s.payments || {});
+  const { currentTransaction, gatewayStatus, withdrawalsProcessed } = useSelector((s) => s.payments || {});
 
   const [step, setStep] = useState(searchParams.get("type") ? "confirm" : "choose");
-  const [paymentType, setPaymentType] = useState(searchParams.get("type") || "watch");
+  const typeParam = searchParams.get("type") || "watch";
+  // Normalize type: movie_watch -> watch, movie_download -> download
+  const normalizedType = typeParam.replace('movie_', '');
+  const [paymentType, setPaymentType] = useState(normalizedType);
   const [movie, setMovie] = useState(null);
   const [movieLoading, setMovieLoading] = useState(true);
   const [movieError, setMovieError] = useState(null);
@@ -62,7 +65,7 @@ export default function Payment() {
   const [statusMessage, setStatusMessage] = useState("");
   const [pollCount, setPollCount] = useState(0);
   const maxPolls = 30;
-
+localStorage.setItem("localpayment:",localPaymentStatus)
   const formatDuration = (seconds) => {
     if (!seconds || seconds === 0) return 'N/A';
     const totalSeconds = parseInt(seconds) || 0;
@@ -107,7 +110,7 @@ export default function Payment() {
           
           // If the API doesn't have seriesPricing endpoint, use local calculation
           // Calculate prices based on base viewPrice
-          const basePrice = movieData.viewPrice || movieData.price || 100;
+          const basePrice = movieData.viewPrice || movieData.price || 0;
           const calculatedPeriods = accessPeriods.map(period => ({
             ...period,
             price: Math.round(basePrice),
@@ -186,7 +189,7 @@ export default function Payment() {
 
   const moviePrice = {
     watch: movie?.viewPrice !== undefined && movie?.viewPrice !== null ? Number(movie.viewPrice) : movie?.price ? Number(movie.price) * 0.8 : 2.99,
-    download: movie?.downloadPrice !== undefined && movie?.downloadPrice !== null ? Number(movie.downloadPrice) : movie?.price ? Number(movie.price) : 4.99,
+    download: movie?.downloadPrice !== undefined && movie?.downloadPrice !== null && movie?.downloadPrice > 0 ? Number(movie.downloadPrice) : movie?.price ? Number(movie.price) : 4.99,
     series_access: calculateSeriesAccessPrice(selectedAccessPeriod),
   };
   
@@ -327,7 +330,7 @@ export default function Payment() {
       <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
-            <button onClick={() => navigate(`/movie/${movieId}`)} className="inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white transition">
+            <button onClick={() => navigate(`/`)} className="inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white transition">
               <ArrowLeft className="w-4 h-4" />Back
             </button>
             <div className="text-sm text-gray-400">Secure · Encrypted · MTN MoMo</div>

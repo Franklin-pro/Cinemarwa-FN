@@ -7,7 +7,6 @@ import {
   CheckCircle, 
   Loader, 
   Eye, 
-  Download, 
   ChevronDown,
   Film,
   Tv,
@@ -106,11 +105,8 @@ function UploadMovie() {
     
     // Pricing - DEFAULT VIEW PRICE SET TO 100
     viewPrice: 100,
-    downloadPrice: 0,
     currency: 'RWF',
     royaltyPercentage: 70,
-    allowDownload: true,
-    downloadExpiry: 30,
     
     // Video Settings
     videoQuality: '720p',
@@ -244,7 +240,6 @@ function UploadMovie() {
       seriesId: series.id,
       seriesTitle: series.title,
       viewPrice: 0, // Episode price is 0
-      downloadPrice: 0
     }));
     setShowSeriesDropdown(false);
     setErrors(prev => ({ ...prev, seriesId: '' }));
@@ -379,10 +374,6 @@ function UploadMovie() {
       if (formData.viewPrice < 100) {
         newErrors.viewPrice = 'View price must be at least 100 RWF';
       }
-      
-      if (formData.downloadPrice < 0) {
-        newErrors.downloadPrice = 'Download price cannot be negative';
-      }
     }
     
     if (isSeries) {
@@ -445,9 +436,6 @@ function UploadMovie() {
       if (isMovie) {
         // Movie pricing
         formDataToSend.append('viewPrice', formData.viewPrice);
-        formDataToSend.append('downloadPrice', formData.downloadPrice);
-        formDataToSend.append('allowDownload', formData.allowDownload);
-        formDataToSend.append('downloadExpiry', formData.downloadExpiry);
         formDataToSend.append('price', formData.viewPrice);
         
         // Movie features
@@ -464,7 +452,6 @@ function UploadMovie() {
       if (isSeries) {
         // Series pricing (series price)
         formDataToSend.append('viewPrice', formData.viewPrice);
-        formDataToSend.append('downloadPrice', 0); // Series don't have downloads
         formDataToSend.append('price', formData.viewPrice);
         formDataToSend.append('totalSeasons', formData.totalSeasons);
         
@@ -488,7 +475,6 @@ function UploadMovie() {
         
         // Episode pricing is 0 (users buy the series)
         formDataToSend.append('viewPrice', 0);
-        formDataToSend.append('downloadPrice', 0);
         formDataToSend.append('price', 0);
         
         // Episodes inherit series features, so no individual features
@@ -531,11 +517,8 @@ function UploadMovie() {
       youtubeTrailerLink: '',
       ageRestriction: 0,
       viewPrice: 100, // Changed from 0 to 100
-      downloadPrice: 0,
       currency: 'RWF',
       royaltyPercentage: 70,
-      allowDownload: true,
-      downloadExpiry: 30,
       videoQuality: '720p',
       videoDuration: 0,
       isFeatured: false,
@@ -593,7 +576,6 @@ function UploadMovie() {
                 seasonNumber: '',
                 episodeNumber: '',
                 viewPrice: 100, // Changed from 0 to 100
-                downloadPrice: 0
               }));
               setSelectedSeries(null);
               setVideoFile(null);
@@ -620,7 +602,6 @@ function UploadMovie() {
                 seasonNumber: '',
                 episodeNumber: '',
                 viewPrice: 100, // Changed from 10 to 100
-                downloadPrice: 0
               }));
               setSelectedSeries(null);
               setVideoFile(null);
@@ -644,7 +625,6 @@ function UploadMovie() {
                 ...prev, 
                 contentType: 'episode',
                 viewPrice: 0, // Episode price is 0
-                downloadPrice: 0
               }));
               setVideoFile(null);
               setErrors(prev => ({ ...prev, videoFile: '' }));
@@ -880,6 +860,7 @@ function UploadMovie() {
           <input
             type="text"
             name="language"
+            disabled
             value={formData.language}
             onChange={handleInputChange}
             placeholder="en"
@@ -895,6 +876,7 @@ function UploadMovie() {
           </label>
           <input
             type="text"
+            disabled
             name="original_language"
             value={formData.original_language}
             onChange={handleInputChange}
@@ -1154,81 +1136,6 @@ function UploadMovie() {
           </div>
         )}
 
-        {/* Download Settings - Only for Movies */}
-        {isMovie && (
-          <div className="space-y-4">
-            <label className="flex items-center gap-3 p-4 border border-gray-700 rounded-lg hover:bg-gray-800/30 cursor-pointer">
-              <input
-                type="checkbox"
-                name="allowDownload"
-                checked={formData.allowDownload}
-                onChange={handleInputChange}
-                className="w-5 h-5 text-blue-500 bg-gray-800 border-gray-700 rounded"
-              />
-              <div>
-                <span className="font-medium">Allow Downloads</span>
-                <p className="text-xs text-gray-400">Users can download for offline viewing</p>
-              </div>
-            </label>
-
-            {formData.allowDownload && (
-              <>
-                {/* Download Price */}
-                <div>
-                  <label className="text-sm font-medium mb-2 flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Download Price
-                    <span className="text-xs font-normal text-gray-400">(Optional)</span>
-                  </label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                      {CURRENCIES.find(c => c.value === formData.currency)?.symbol || '$'}
-                    </span>
-                    <input
-                      type="number"
-                      name="downloadPrice"
-                      value={formData.downloadPrice}
-                      onChange={handleInputChange}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0"
-                      className={`w-full pl-10 pr-4 py-3 bg-gray-800/50 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.downloadPrice ? 'border-red-500' : 'border-gray-700'
-                      }`}
-                    />
-                  </div>
-                  {errors.downloadPrice && (
-                    <p className="text-red-400 text-sm mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-4 h-4" />
-                      {errors.downloadPrice}
-                    </p>
-                  )}
-                  <p className="text-gray-400 text-xs mt-1">
-                    Set to 0 if downloads are free with purchase
-                  </p>
-                </div>
-
-                {/* Download Expiry */}
-                <div>
-                  <label className="block text-sm font-medium mb-2">Download Expiry (Days)</label>
-                  <input
-                    type="number"
-                    name="downloadExpiry"
-                    value={formData.downloadExpiry}
-                    onChange={handleInputChange}
-                    placeholder="30"
-                    min="1"
-                    max="365"
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <p className="text-gray-400 text-xs mt-1">
-                    How long download links remain valid after purchase
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-        )}
 
         {/* Royalty Percentage */}
         <div>

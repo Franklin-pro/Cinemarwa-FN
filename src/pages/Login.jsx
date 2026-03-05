@@ -396,14 +396,14 @@ function Login() {
             </div>
 
             {/* Divider */}
-            <div className="flex items-center gap-3 my-6">
+            {/* <div className="flex items-center gap-3 my-6">
               <div className="flex-1 h-px bg-gray-700"></div>
               <span className="text-gray-400 text-sm">Or continue with</span>
               <div className="flex-1 h-px bg-gray-700"></div>
-            </div>
+            </div> */}
 
             {/* Google Login Button */}
-            <button
+            {/* <button
               type="button"
               onClick={handleGoogleLoginSuccess}
               disabled={loading || !deviceFingerprint}
@@ -428,7 +428,7 @@ function Login() {
                 />
               </svg>
               {loading ? 'Signing in...' : !deviceFingerprint ? 'Loading...' : 'Continue with Google'}
-            </button>
+            </button> */}
           </form>
         )}
 

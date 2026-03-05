@@ -6,6 +6,7 @@ import MovieContent from "./components/MovieContent"
 import UserHomepage from "./components/UserHomepage"
 import Navbar from "./components/Navbar"
 import ScrollTop from "./components/ScrollTop"
+import ScrollToTop from "./components/ScrollToTop"
 import { MovieProvider } from "./context/MovieProvider";
 
 // Pages
@@ -28,10 +29,13 @@ import PaymentMethodSetup from './pages/filmmaker/PaymentMethodSetup';
 import WithdrawalRequest from './pages/filmmaker/WithdrawalRequest';
 import WithdrawalHistory from './pages/filmmaker/WithdrawalHistory';
 import UpgradePage from './pages/UpgradePage';
+import AllMoviesPage from './pages/AllMoviesPage';
 
 // Import AdminDashboard component if needed
 import AdminDashboard from './pages/dashboard/FilmmakerDashboard';
 import FilmmakerSeriesEpisodes from './pages/filmmaker/FilmmakerSeriesEpisodes';
+import Polincy from './pages/Polincy';
+import HelpCenter from './pages/HelpCenter';
 
 // Home component that routes based on auth status
 function HomePage() {
@@ -75,14 +79,18 @@ function AppContent() {
 
   return (
     <>
+      <ScrollToTop />
       {!isDashboardRoute && <Navbar />}
       <main>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/movies" element={<AllMoviesPage />} />
           <Route path="/upgrade" element={<UpgradePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/help-center" element={<HelpCenter />} />
+          <Route path="/privancy-polincy" element={<Polincy />} />
           <Route path="/auth/callback" element={<GoogleCallback />} />
           <Route path="/movie/:id" element={<MovieDetailsPage />} />
 

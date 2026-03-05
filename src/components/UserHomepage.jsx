@@ -4,7 +4,8 @@ import MovieSlider from './MovieSlider'
 import HeroSection from './HeroSection'
 import MovieDetails from './MovieDetails'
 import { useMovies } from '../context/MovieContext'
-import { normalizeMovies } from './MovieAdapter'
+// import { normalizeMovies } from './MovieAdapter'
+// import AdSense from './AdSense'
 
 function UserHomepage() {
   const { selectMovieId, closeMovieDetails, openMovieDetails } = useMovies();
@@ -76,6 +77,10 @@ function UserHomepage() {
         <HeroSection />
       </section>
 
+      {/* <div className="bg-neutral-950 py-6 flex justify-center">
+  <AdSense slot="1234567890" />
+</div> */}
+
       {/* Trending Section */}
       {trendingMovies.length > 0 && (
         <section id="trending" className="bg-gradient-to-b from-neutral-900 to-neutral-950">
@@ -87,6 +92,10 @@ function UserHomepage() {
         </section>
       )}
 
+      {/* <div className="bg-neutral-950 py-6 flex justify-center">
+  <AdSense slot="1234567891" />
+</div> */}
+
       {/* Featured Section */}
       {featuredMovies.length > 0 && (
         <section id="featured" className="bg-gradient-to-b from-neutral-900 to-neutral-950">
@@ -97,6 +106,9 @@ function UserHomepage() {
           />
         </section>
       )}
+      {/* <div className="bg-neutral-950 py-6 flex justify-center">
+  <AdSense slot="1234567891" />
+</div> */}
 
       {/* All Movies Section */}
       {allMovies.length > 0 && (

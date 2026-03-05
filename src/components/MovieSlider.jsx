@@ -116,9 +116,9 @@ function MovieSlider({ title, subtitle = "", movies }) {
     // Default to Movie if we can't determine
     console.warn('Could not determine content type for movie:', movie.id, movie.title);
     return { 
-      icon: <Film className="w-3 h-3 text-gray-500" />, 
-      label: "Unknown", 
-      color: "bg-gray-600" 
+      icon: <Film className="w-3 h-3 text-gray-100" />, 
+      label: "Movie", 
+      color: "bg-gray-900" 
     };
   };
 

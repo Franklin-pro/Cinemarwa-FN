@@ -1,4 +1,4 @@
-import { Facebook, Github, Instagram, TwitterIcon, Mail, CheckCircle, AlertCircle } from "lucide-react";
+import { Facebook, Github, Instagram, TwitterIcon, Mail, CheckCircle, AlertCircle, Film, MapPin, Phone, Clock, Shield } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { subscribeService } from "../services/api/subscribe";
@@ -12,7 +12,6 @@ function Footer() {
   const [subscribeMessage, setSubscribeMessage] = useState('');
   const [subscribeError, setSubscribeError] = useState('');
   
-  // detect login state
   useEffect(() => {
     setUserIsLoggedIn(!!(user && user.token));
   }, [user]);
@@ -32,226 +31,144 @@ function Footer() {
           weeklyDigest: true,
         },
       });
-      setSubscribeMessage('✓ Successfully subscribed to our newsletter!');
+      setSubscribeMessage('✓ Successfully subscribed!');
       setSubscribeEmail('');
-      setTimeout(() => setSubscribeMessage(''), 5000);
+      setTimeout(() => setSubscribeMessage(''), 3000);
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Failed to subscribe';
+      const errorMsg = error.response?.data?.message || 'Subscription failed';
       setSubscribeError(errorMsg);
-      setTimeout(() => setSubscribeError(''), 5000);
+      setTimeout(() => setSubscribeError(''), 3000);
     } finally {
       setSubscribeLoading(false);
     }
   };
 
-  // 🔥 hide footer if user is filmmaker or admin
   if (userIsLoggedIn && ["filmmaker", "admin"].includes(user?.role)) {
     return null;
   }
 
+  const cinemaLocations = [
+    { name: "GATENGA", city: "Kigali / Gatenga" },
+    { name: "OKG MUSIC OFFICE", city: "Kigali / Niboye" },
+  ];
+
   return (
-    <footer className="bg-neutral-900 text-neutral-400 border-t border-neutral-800">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          <div>
-            <a href="" className="inline-block mb-6">
-              <span className="text-blue-500 text-2xl font-bold">
-                <img src={cinemaLogo} alt="logo" className=" w-32 h-16 object-cover" />
-              </span>
-            </a>
-            <p className="mb-4 text-sm">
-              cine verse is a movie website that provides users with a vast
-              collection of movies and TV shows from Rwanda. With a
-              user-friendly interface and powerful search functionality, users
-              can easily find their favorite movies and discover new ones.
+    <footer className="bg-gray-900 text-gray-300 border-t border-gray-800">
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Brand */}
+          <div className="col-span-1">
+            <img src={cinemaLogo} alt="CinemaRwa" className="w-32 h-16 object-contain mb-3" />
+            <p className="text-gray-400 text-sm mb-3">
+              Rwanda's premier movie platform.
             </p>
-            <div className="flex space-x-4">
-              <a
-                href="https://github.com/Franklin-pro/"
-                className="text-neutral-500 hover:text-blue-500 transition-colors"
-              >
-                <Github className="w-7 h-7" />
+            <div className="flex gap-2">
+              <a href="https://github.com/Franklin-pro/" className="bg-gray-800 hover:bg-blue-600 p-2 rounded-full">
+                <Github className="w-4 h-4" />
               </a>
-              <a
-                href="https://www.instagram.com/g_wayne_1/"
-                className="text-neutral-500 hover:text-blue-500 transition-colors"
-              >
-                <Instagram className="w-7 h-7" />
+              <a href="https://www.instagram.com/g_wayne_1/" className="bg-gray-800 hover:bg-pink-600 p-2 rounded-full">
+                <Instagram className="w-4 h-4" />
               </a>
-              <a
-                href="https://x.com/franklinpro21?t=m0lPOVUn8-X-4cSyrUUFlw&s=09"
-                className="text-neutral-500 hover:text-blue-500 transition-colors"
-              >
-                <TwitterIcon className="w-7 h-7" />
+              <a href="https://x.com/franklinpro21" className="bg-gray-800 hover:bg-blue-400 p-2 rounded-full">
+                <TwitterIcon className="w-4 h-4" />
+              </a>
+              <a href="https://facebook.com" className="bg-gray-800 hover:bg-blue-700 p-2 rounded-full">
+                <Facebook className="w-4 h-4" />
               </a>
             </div>
           </div>
 
+          {/* Quick Links */}
           <div>
-            <h3 className="font-bold text-white text-lg mb-4">Quick Links</h3>
+            <h3 className="text-white font-semibold text-md mb-3">Quick Links</h3>
             <ul className="space-y-2 text-sm">
-              <li>
-                <a href="#" className="hover:text-blue-500 transition-colors">
-                  Home
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#trending"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  Trending
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#toprated"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  Top Rated
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#popular"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  Popular
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#movies"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  Movies
-                </a>
-              </li>
+              {['Movies', 'Showtimes', 'Cinemas', 'Coming Soon'].map((item) => (
+                <li key={item}>
+                  <a href="#" className="hover:text-blue-400 transition-colors">
+                    {item}
+                  </a>
+                </li>
+              ))}
             </ul>
           </div>
 
+          {/* Locations */}
           <div>
-            <h3 className="font-bold text-white text-lg mb-4">Resources</h3>
+            <h3 className="text-white font-semibold text-md mb-3 flex items-center gap-1">
+              <MapPin className="w-4 h-4" />
+              Cinemas
+            </h3>
             <ul className="space-y-2 text-sm">
-              <li>
-                <a
-                  href="#about"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  About
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#contacts"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  Contacts
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#blogs"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  Blogs
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#fqa"
-                  className="hover:text-blue-500 transition-colors"
-                >
-                  FQA
-                </a>
-              </li>
-              <li>
-                <a href="#" className="hover:text-blue-500 transition-colors">
-                  Help Center
-                </a>
-              </li>
+              {cinemaLocations.map((cinema) => (
+                <li key={cinema.name}>
+                  <p className="font-medium">{cinema.name}</p>
+                  <p className="text-xs text-gray-500">{cinema.city}</p>
+                </li>
+              ))}
             </ul>
           </div>
 
+          {/* Newsletter & Contact */}
           <div>
-            <h3 className="font-bold text-white text-lg mb-4">News Letter</h3>
-            <p className="text-sm mb-4">
-              Stay up to date with the latest movies and news
-            </p>
-            <form onSubmit={handleSubscribe} className="space-y-3">
-              <div className="relative">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  value={subscribeEmail}
-                  onChange={(e) => setSubscribeEmail(e.target.value)}
-                  required
-                  className="w-full bg-neutral-800 border border-neutral-700 text-white px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
+            <h3 className="text-white font-semibold text-md mb-3">Updates</h3>
+            <form onSubmit={handleSubscribe} className="mb-3">
+              <input
+                type="email"
+                placeholder="Email"
+                value={subscribeEmail}
+                onChange={(e) => setSubscribeEmail(e.target.value)}
+                required
+                className="w-full bg-gray-800 border border-gray-700 text-white px-3 py-2 text-sm rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 mb-2"
+              />
+              
               {subscribeMessage && (
-                <div className="flex items-center gap-2 text-green-400 text-sm">
-                  <CheckCircle className="w-4 h-4" />
-                  {subscribeMessage}
+                <div className="flex items-center gap-1 text-green-400 text-xs mb-2">
+                  <CheckCircle className="w-3 h-3" />
+                  <span>{subscribeMessage}</span>
                 </div>
               )}
-              {subscribeError && (
-                <div className="flex items-center gap-2 text-blue-400 text-sm">
-                  <AlertCircle className="w-4 h-4" />
-                  {subscribeError}
-                </div>
-              )}
+              
               <button 
                 type="submit"
                 disabled={subscribeLoading}
-                className="bg-blue-500 w-full hover:bg-blue-700 disabled:bg-blue-600 disabled:opacity-50 text-white py-2 rounded-lg transition-all text-sm font-semibold flex items-center justify-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 text-sm rounded-lg font-medium"
               >
-                {subscribeLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Subscribing...
-                  </>
-                ) : (
-                  <>
-                    <Mail className="w-4 h-4" />
-                    Subscribe
-                  </>
-                )}
+                {subscribeLoading ? 'Subscribing...' : 'Subscribe'}
               </button>
             </form>
+
+            <div className="text-xs space-y-1">
+              <div className="flex items-center gap-2">
+                <Phone className="w-3 h-3 text-blue-400" />
+                <span>+250 783 446 449</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3 text-blue-400" />
+                <span>Sat-Sun: 8AM-2PM</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="border-t mt-3 pt-6 flex flex-col md:flex-row justify-between border-neutral-800">
-          <p className="text-xs">
-            &copy; {new Date().getFullYear()} CineVerse All right reserved.{" "}
-            <br className="md:hidden" />
-            <span className="hidden md:inline">.</span>
-            Powered by{" "}
-            <a
-              href="https://franklindevloper.netlify.app/"
-              target="_blank"
-              className="text-blue-400 font-semibold hover:text-blue-300"
-            >
+        {/* Bottom Bar */}
+        <div className="mt-6 pt-4 border-t border-gray-800">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-2 text-xs">
+            <p className="text-gray-500">
+              © {new Date().getFullYear()} CinemaRwa
+            </p>
+            <div className="flex items-center gap-4">
+              <a href="/privacy-policy" className="hover:text-blue-400 flex items-center gap-1">
+                <Shield className="w-3 h-3" />
+                Privacy
+              </a>
+              <a href="/terms" className="hover:text-blue-400">Terms</a>
+            </div>
+          </div>
+          
+          <div className="text-center mt-3 text-xs text-gray-600">
+            Developed by{" "}
+            <a href="https://franklindevloper.netlify.app/" className="text-blue-400 hover:text-blue-300">
               Franklin Developer
-            </a>
-          </p>
-
-          <div className="flex space-x-4 mt-4 md:mt-0 text-xs">
-            <a
-              href="#privancy policy"
-              className="hover:text-blue-400 transition-all"
-            >
-              Privacy Policy
-            </a>
-            <a
-              href="term and services"
-              className="hover:text-blue-400 transition-all"
-            >
-              Terms of Service
-            </a>
-            <a href="" className="hover:text-blue-400 transition-all">
-              Help Center
             </a>
           </div>
         </div>

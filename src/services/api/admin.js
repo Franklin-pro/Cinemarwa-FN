@@ -96,6 +96,7 @@ export const fetchHealthSystem = async () => {
   return response.data;
 }
 
+
 export const getFlaggedContent = async (type = 'all') => {
   const response = await adminAPI.get(`/flagged-content?type=${type}`);
   return response.data;

@@ -62,23 +62,24 @@ const Navbar = () => {
   // Navigation items
   const navItems = isLoggedIn
     ? [
-        { id: "home", label: "Home" },
-        { id: "movies", label: "All Movies" },
-        { id: "single-movie", label: "Single Movie" },
-        { id: "series", label: "Series Movie" }
+        { id: "home", label: "Home", path: "/" },
+        { id: "movies", label: "All Movies", path: "/movies?type=all" },
+        { id: "single-movie", label: "Movies", path: "/movies?type=movie" },
+        { id: "series", label: "Series", path: "/movies?type=series" }
       ]
     : [
-        { id: "home", label: "Home" },
-        { id: "movies", label: "All Movies" },
-        { id: "single-movie", label: "Single Movie" },
-        { id: "series", label: "Series Movie" }
+        { id: "home", label: "Home", path: "/" },
+        { id: "movies", label: "All Movies", path: "/movies?type=all" },
+        { id: "single-movie", label: "Movies", path: "/movies?type=movie" },
+        { id: "series", label: "Series", path: "/movies?type=series" }
       ];
 
-  // Smooth scroll to section
-  const scrollToSection = (sectionId) => {
-    const element = document.getElementById(sectionId);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
+  // Handle navigation
+  const handleNavigation = (item) => {
+    if (item.path) {
+      navigate(item.path);
+    } else {
+      scrollToSection(item.id);
     }
     setIsOpen(false);
   };
@@ -161,7 +162,7 @@ const Navbar = () => {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => scrollToSection(item.id)}
+              onClick={() => handleNavigation(item)}
               className="relative text-white hover:text-blue-500 transition group focus:outline-none"
             >
               {item.label}
@@ -348,7 +349,7 @@ const Navbar = () => {
             {navItems.map((item) => (
               <button
                 key={item.id}
-                onClick={() => scrollToSection(item.id)}
+                onClick={() => handleNavigation(item)}
                 className="text-white hover:text-blue-500 transition py-2 text-left focus:outline-none"
               >
                 {item.label}

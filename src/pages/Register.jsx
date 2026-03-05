@@ -24,6 +24,8 @@ function Register() {
   const [deviceInfo, setDeviceInfo] = useState(null);
   const [showDeviceInfo, setShowDeviceInfo] = useState(false);
 
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
   // Initialize fingerprint on component mount
   useEffect(() => {
     const initFingerprint = () => {
@@ -84,7 +86,7 @@ function Register() {
       sessionStorage.setItem('pendingRegistrationRole', formData.role);
       
       // Initiate Google OAuth flow
-      window.location.href = `http://localhost:5000/api/auth/google?role=${formData.role}`;
+      window.location.href = `${BACKEND_URL}/api/auth/google?role=${formData.role}`;
     } catch (error) {
       console.error('Google signup error:', error);
     }
