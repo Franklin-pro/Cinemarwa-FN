@@ -53,6 +53,8 @@ function Profile() {
     cancelText: 'Cancel'
   });
 
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
   // Get activeDevices from user object
   const activeDevices = user?.activeDevices || [];
   const currentDevices = activeDevices.length;
@@ -124,7 +126,7 @@ function Profile() {
       }
 
       // Fetch user data from your API
-      const response = await fetch('http://localhost:5000/api/auth/me', {
+      const response = await fetch(`${BACKEND_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -229,7 +231,7 @@ function Profile() {
         throw new Error('No authentication token found');
       }
 
-      const response = await fetch('http://localhost:5000/api/auth/change-password', {
+      const response = await fetch(`${BACKEND_URL}/api/auth/change-password`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -293,7 +295,7 @@ function Profile() {
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch('http://localhost:5000/api/auth/remove-device', {
+          const response = await fetch(`${BACKEND_URL}/api/auth/remove-device`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -329,7 +331,7 @@ function Profile() {
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          await fetch('http://localhost:5000/api/auth/logout-all', {
+          await fetch(`${BACKEND_URL}/api/auth/logout-all`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -363,7 +365,7 @@ function Profile() {
         try {
           const token = localStorage.getItem('token');
           if (token) {
-            await fetch('http://localhost:5000/api/auth/logout', {
+            await fetch(`${BACKEND_URL}/api/auth/logout`, {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${token}`
@@ -395,7 +397,7 @@ function Profile() {
       onConfirm: async () => {
         try {
           const token = localStorage.getItem('token');
-          const response = await fetch('http://localhost:5000/api/auth/delete-account', {
+          const response = await fetch(`${BACKEND_URL}/api/auth/delete-account`, {
             method: 'DELETE',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -436,7 +438,7 @@ function Profile() {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/auth/update-profile', {
+      const response = await fetch(`${BACKEND_URL}/api/auth/update-profile`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
